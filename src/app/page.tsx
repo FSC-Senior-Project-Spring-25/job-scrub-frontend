@@ -2,27 +2,13 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { FaSearch, FaUser } from 'react-icons/fa';
+import { FaSearch } from 'react-icons/fa';
 
 export default function HomePage() {
   const [search, setSearch] = useState('');
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center">
-  
-      <nav className="w-full bg-white shadow-md flex justify-between items-center px-6 py-4">
-        <div className="flex items-center space-x-6">
-          <Link href="#" className="text-2xl font-bold text-green-700">JobScrub</Link>
-          <Link href="/report" className="text-gray-700">Report a Job</Link>
-          <Link href="#" className="text-gray-700">Enhance your resume</Link>
-          <Link href="#" className="text-gray-700">Connect with others</Link>
-        </div>
-        <Link href="#" className="text-gray-700 flex items-center">
-          <FaUser className="mr-2" /> Sign In
-        </Link>
-      </nav>
-
-     
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center">     
       <div className="mt-6 w-full flex items-center px-6">
         <span className="mr-6 font-semibold text-black whitespace-nowrap">Your Job Search, Our Priority.</span>
         <div className="flex-1 flex items-center border border-gray-300 rounded-lg bg-white px-4 py-2 w-full max-w-full">
