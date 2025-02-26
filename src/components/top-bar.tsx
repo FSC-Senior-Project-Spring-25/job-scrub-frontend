@@ -47,7 +47,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
           </div>
           <div className="flex items-center">
             <Link
-              href="/signin"
+              href="/login"
               className="hidden sm:flex text-gray-700 hover:text-green-600 transition-colors items-center whitespace-nowrap"
             >
               <FaUser className="mr-2" />
@@ -77,7 +77,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
               </Link>
             ))}
             <Link
-              href="/signin"
+              href="/login"
               className="text-gray-700 hover:text-green-600 transition-colors flex items-center px-3 py-2"
               onClick={toggleMenu}
             >

@@ -28,10 +28,10 @@ export default function HomePage() {
         <h2 className="text-6xl font-extrabold text-black drop-shadow-md">Welcome to</h2>
         <h2 className="text-6xl font-extrabold text-black drop-shadow-md mt-2">JobScrub</h2>
         <p className="text-gray-600 text-lg mt-2 font-semibold drop-shadow-sm">Your Career Journey, Simplified.</p>
-        <button className="mt-6 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+        <Link href="signup" className="mt-6 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
           Create an Account
-        </button>
-        <Link href="#" className="mt-2 text-blue-600 hover:underline">Already a User? Sign In</Link>
+        </Link>
+        <Link href="login" className="mt-2 text-blue-600 hover:underline">Already a User? Sign In</Link>
       </div>
     </div>
   );
