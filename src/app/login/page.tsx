@@ -21,7 +21,7 @@ export default function Login() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // redirect to the main page here on successfull login
+      // redirect to the main page here on successfull login im in Arvinder-branch
       router.push('/'); 
     } catch (err) {
       setError('Invalid email or password. Please try again.');
