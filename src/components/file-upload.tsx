@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useDropzone } from "react-dropzone"
 import { UploadCloud, File, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface FileUploadProps {
   onFileChange: (file: File | null) => void
@@ -55,38 +56,47 @@ export const FileUpload = ({
       {!file ? (
         <div
           {...getRootProps()}
-          className={`p-6 flex flex-col items-center justify-center border-dashed border-2 
-            ${isDragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"} 
-            rounded-lg cursor-pointer h-60 bg-white transition-colors duration-200 hover:border-blue-400 hover:bg-blue-50/50`}
+          className={`border-2 border-dashed rounded-lg h-60 cursor-pointer transition-colors hover:border-primary/50 hover:bg-muted/50 ${
+            isDragActive ? "border-primary bg-primary/10" : "border-border"
+          }`}
         >
-          <input {...getInputProps()} />
-          <UploadCloud className="w-12 h-12 text-gray-500 mb-2" />
-          <p className="text-lg font-medium text-gray-700">{label}</p>
-          <p className="text-sm text-gray-500 text-center mt-1">{description}</p>
-          <p className="text-xs text-gray-400 mt-2">
-            {Object.entries(acceptedFileTypes).map(([type, extensions]) => extensions.join(", ")).join(" or ")} files only
-          </p>
-          {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
+          <div className="flex h-full flex-col items-center justify-center p-6">
+            <input {...getInputProps()} />
+            <UploadCloud className="mb-2 h-12 w-12 text-muted-foreground" />
+            <p className="text-lg font-medium text-foreground">{label}</p>
+            <p className="mt-1 text-center text-sm text-muted-foreground">{description}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {Object.entries(acceptedFileTypes)
+                .map(([type, extensions]) => extensions.join(", "))
+                .join(" or ")}{" "}
+              files only
+            </p>
+            {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+          </div>
         </div>
       ) : (
-        <div className="p-6 bg-white border border-gray-200 rounded-lg h-60 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-700">Uploaded File</h3>
-            <button
-              onClick={removeFile}
-              className="text-gray-500 hover:text-red-500 transition-colors duration-200"
-              aria-label="Remove file"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          
-          <div className="flex flex-col items-center justify-center flex-grow bg-gray-50 rounded-md p-4">
-            <File className="w-12 h-12 text-blue-500 mb-3" />
-            <p className="font-medium text-gray-800 break-all text-center">{file.name}</p>
-            <p className="text-sm text-gray-500 mt-1">
-              {(file.size / 1024 / 1024).toFixed(2)} MB
-            </p>
+        <div className="h-60 border border-border rounded-lg bg-background">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  removeFile()
+                }}
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-destructive"
+                aria-label="Remove file"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="flex flex-col items-center justify-center flex-grow rounded-md bg-muted p-4">
+              <File className="mb-3 h-12 w-12 text-primary" />
+              <p className="break-all text-center font-medium text-foreground">{file.name}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+            </div>
           </div>
         </div>
       )}
@@ -95,3 +105,4 @@ export const FileUpload = ({
 }
 
 export default FileUpload
+
