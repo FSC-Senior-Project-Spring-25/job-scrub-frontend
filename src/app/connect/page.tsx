@@ -33,6 +33,38 @@ export default function ConnectFeed() {
     fetchPosts();
   }, []);
 
+  async function likePost(postId: string) {
+    try {
+      await fetch(`/api/posts/${postId}/like`, { method: "POST" });
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post.id === postId ? { ...post, likes: post.likes + 1 } : post
+        )
+      );
+    } catch (error) {
+      console.error("Error liking post:", error);
+    }
+  }
+
+  async function addComment(postId: string, comment: string) {
+    try {
+      await fetch(`/api/posts/${postId}/comment`, {
+        method: "POST",
+        body: JSON.stringify({ comment }),
+        headers: { "Content-Type": "application/json" },
+      });
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post.id === postId
+            ? { ...post, comments: [...post.comments, comment] }
+            : post
+        )
+      );
+    } catch (error) {
+      console.error("Error adding comment:", error);
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto p-6 flex gap-6">
       {/* Left Sidebar - User Info */}
@@ -66,10 +98,10 @@ export default function ConnectFeed() {
                   {format(new Date(post.created_at), "PPP")}
                 </p>
                 <div className="flex items-center gap-4 mt-3">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => likePost(post.id)}>
                     <Heart className="w-4 h-4 mr-1" /> {post.likes}
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => addComment(post.id, "Nice post!")}>
                     <MessageSquare className="w-4 h-4 mr-1" /> {post.comments.length}
                   </Button>
                 </div>
