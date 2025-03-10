@@ -15,6 +15,9 @@ export const POST = async (req: NextRequest) => {
 
       const response = await fetch(`${process.env.API_URL}/upload-resume`, {
         method: 'POST',
+        headers: {
+          'Authorization': req.headers.get('Authorization') || '',
+        },
         body: formData,
       });
 

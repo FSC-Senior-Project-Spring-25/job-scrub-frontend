@@ -12,7 +12,7 @@ export const GET = async (req: NextRequest) => {
           { status: 400 }
         );
       }
-
+    
       const response = await fetch(`${process.env.API_URL}/view-resume?key=${encodeURIComponent(key)}`, {
         method: 'GET',
         headers: {

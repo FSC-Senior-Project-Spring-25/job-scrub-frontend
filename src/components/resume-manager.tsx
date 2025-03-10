@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import FileUpload from "./file-upload";
+import { useAuth } from "@/app/AuthContext";
 
 interface ResumeData {
   success: boolean;
@@ -17,9 +18,14 @@ export default function ResumeManager() {
   const [resumeUrl, setResumeUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const { user } = useAuth();
 
   const handleUpload = async () => {
     if (!selectedFile) return;
+    if (!user) {
+      toast.error("You must be logged in to upload a resume");
+      return;
+    }
     
     setLoading(true);
     setError(null);
@@ -30,6 +36,9 @@ export default function ResumeManager() {
     try {
       const response = await fetch("/api/resume/upload", {
         method: "POST",
+        headers: {
+          "Authorization": `Bearer ${await user.getIdToken()}` // Use Firebase token for auth
+        },
         body: formData,
       });
       
@@ -57,7 +66,7 @@ export default function ResumeManager() {
   };
 
   const loadResumePreview = async () => {
-    if (!resumeData?.file_id) return;
+    if (!resumeData?.file_id || !user) return;
     
     setLoading(true);
     setError(null);
@@ -65,7 +74,10 @@ export default function ResumeManager() {
     
     try {
       const response = await fetch(`/api/resume/view?key=${encodeURIComponent(resumeData.file_id)}`, {
-        method: "GET"
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${await user.getIdToken()}` // Use Firebase token for auth
+        }
       });
       
       if (!response.ok) {
@@ -92,15 +104,25 @@ export default function ResumeManager() {
 
   // Load the preview when resumeData changes
   useEffect(() => {
-    if (resumeData?.file_id) {
+    if (resumeData?.file_id && user) {
       loadResumePreview();
     }
-  }, [resumeData]);
+  }, [resumeData, user]);
 
   // For debugging
   useEffect(() => {
     console.log("Resume URL updated:", resumeUrl);
   }, [resumeUrl]);
+
+  // Add authentication check
+  if (!user) {
+    return (
+      <div className="max-w-3xl mx-auto p-6 text-center">
+        <h1 className="text-2xl font-bold mb-4">Resume Manager</h1>
+        <p className="text-muted-foreground">Please log in to manage your resume</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto p-6">
