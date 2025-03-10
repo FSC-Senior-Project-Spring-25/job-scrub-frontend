@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { FaUser, FaBars, FaTimes } from 'react-icons/fa';
+import { useAuth } from '@/app/AuthContext';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/app/firebase';
 
 interface NavItem {
   href: string;
@@ -19,6 +22,13 @@ const defaultNavItems: NavItem[] = [
   { href: '/enhance', label: 'Enhance your resume' },
   { href: '/connect', label: 'Connect with others' },
 ];
+
+
+    const logout = async()=>{
+        await signOut(auth);
+      
+    }
+    
 
 export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -53,6 +63,10 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
               <FaUser className="mr-2" />
               <span>Sign In</span>
             </Link>
+           <button onClick={logout}className="hidden ml-3 sm:flex text-gray-700 hover:text-green-600 transition-colors items-center whitespace-nowrap"
+>
+              <span>Sign Out</span>
+           </button> 
             <button
               onClick={toggleMenu}
               className="sm:hidden text-gray-700 hover:text-green-600 transition-colors ml-4"
