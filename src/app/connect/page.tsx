@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Heart, MessageSquare, Plus } from "lucide-react";
 import { format } from "date-fns";
 
+
 interface Post {
   id: string;
   author: string;
@@ -17,7 +18,7 @@ interface Post {
 export default function ConnectFeed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [newPostContent, setNewPostContent] = useState("");
   useEffect(() => {
     async function fetchPosts() {
       try {
@@ -32,17 +33,44 @@ export default function ConnectFeed() {
     }
     fetchPosts();
   }, []);
+  
 
   async function likePost(postId: string) {
     try {
+      
       await fetch(`/api/posts/${postId}/like`, { method: "POST" });
-      setPosts((prevPosts) =>
-        prevPosts.map((post) =>
-          post.id === postId ? { ...post, likes: post.likes + 1 } : post
-        )
+
+      // Locally update the post's likes count
+      const res = await fetch("/api/posts");
+      const updatedPosts = await res.json();
+      setPosts(updatedPosts);
+    } catch (err) {
+      console.error("Error liking post:", err);
+    }
+  }
+
+  async function handleAddPost() {
+    if (!newPostContent.trim()) {
+      return; // Don't post empty content
+    }
+    try {
+      // For now, we're using query params. Adjust if your backend expects JSON body.
+      const response = await fetch(
+        `/api/posts?author=testUser&content=${encodeURIComponent(newPostContent)}`,
+        { method: "POST" }
       );
+      const result = await response.json();
+      console.log("Post created:", result);
+
+      // Re-fetch posts to refresh the feed
+      const res = await fetch("/api/posts");
+      const data = await res.json();
+      setPosts(data);
+
+      // Clear the textarea
+      setNewPostContent("");
     } catch (error) {
-      console.error("Error liking post:", error);
+      console.error("Error creating post:", error);
     }
   }
 
@@ -81,7 +109,14 @@ export default function ConnectFeed() {
       <div className="w-3/4">
         <div className="bg-white p-4 rounded-lg shadow-md mb-4">
           <h2 className="text-lg font-semibold">What's on your mind?</h2>
-          <Button className="w-full mt-3 flex items-center gap-2 bg-green-500 text-white">
+          <textarea
+            className="w-full mt-2 p-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+            rows={3}
+            value={newPostContent}
+            onChange={(e) => setNewPostContent(e.target.value)}
+            placeholder="Share your thoughts..."
+          />
+          <Button className="w-full mt-3 flex items-center gap-2 bg-green-500 text-white"  onClick={handleAddPost}>
             <Plus className="w-4 h-4" /> Add Post
           </Button>
         </div>
@@ -102,7 +137,7 @@ export default function ConnectFeed() {
                     <Heart className="w-4 h-4 mr-1" /> {post.likes}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => addComment(post.id, "Nice post!")}>
-                    <MessageSquare className="w-4 h-4 mr-1" /> {post.comments.length}
+                    <MessageSquare className="w-4 h-4 mr-1" /> {" "}{post.comments.length}
                   </Button>
                 </div>
               </CardContent>
