@@ -56,7 +56,6 @@ const formSchema = z.object({
   skills: z.array(z.string()).min(1, {
     message: "At least one skill is required.",
   }),
-  // Make location mandatory
   location: z.string().min(1, {
     message: "Location is required.",
   }).refine(
@@ -65,9 +64,7 @@ const formSchema = z.object({
       message: "Location must be in 'City, State' format.",
     }
   ),
-  job_type: z
-    .enum(["fulltime", "parttime", "contract", "freelance", "internship"])
-    .optional(),
+  job_type: z.enum(["fulltime", "parttime", "contract", "freelance", "internship"])
 });
 
 function debounce<F extends (...args: any[]) => any>(
