@@ -1,7 +1,9 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { FaFileAlt, FaPlus, FaTrash } from "react-icons/fa";
+import { Loader2 } from "lucide-react";
 import { auth } from "@/app/firebase";
+import { toast } from "sonner";
 
 interface Resume {
   key: string;
@@ -12,19 +14,26 @@ export default function ResumeSection() {
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [resumes, setResumes] = useState<Resume[]>([]);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // ✅ Fetch uploaded resumes from backend
+  //  Fetch uploaded resumes from backend
   const fetchResumes = async () => {
     if (!auth.currentUser) return;
 
     try {
-      const response = await fetch("/api/get-resumes");
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch("/api/get-resumes", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
       if (!response.ok) throw new Error("Failed to fetch resumes");
 
       const data = await response.json();
       setResumes(data.resumes || []);
     } catch (error) {
       console.error("Error fetching resumes:", error);
+      toast.error("Error fetching resumes. Please try again.");
     }
   };
 
@@ -38,7 +47,7 @@ export default function ResumeSection() {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
       if (selectedFile.type !== "application/pdf") {
-        alert("Please upload a PDF file.");
+        toast.error("Please upload a PDF file.");
         return;
       }
       setFile(selectedFile);
@@ -47,11 +56,11 @@ export default function ResumeSection() {
 
   const handleUpload = async () => {
     if (!file) {
-      alert("Please select a file");
+      toast.error("Please select a file.");
       return;
     }
     if (!auth.currentUser) {
-      alert("User not authenticated");
+      toast.error("User not authenticated.");
       return;
     }
 
@@ -63,22 +72,20 @@ export default function ResumeSection() {
     setUploading(true);
 
     try {
-      console.log("📡 Uploading file:", file.name);
+      console.log(" Uploading file:", file.name);
       const response = await fetch("/api/upload-resume", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
       if (!response.ok) throw new Error("Upload failed");
 
-      alert("✅ Resume uploaded successfully!");
+      toast.success(" Resume uploaded successfully!");
       fetchResumes();
     } catch (error) {
-      console.error("🔥 Upload error:", error);
-      alert("Failed to upload resume.");
+      console.error("Upload error:", error);
+      toast.error("Failed to upload resume.");
     } finally {
       setUploading(false);
       setFile(null);
@@ -87,18 +94,29 @@ export default function ResumeSection() {
 
   const handleDeleteResume = async (fileName: string) => {
     try {
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch(`/api/delete-resume?file_name=${fileName}`, {
         method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) throw new Error("Delete failed");
 
-      alert("✅ Resume deleted successfully!");
+      toast.success(" Resume deleted successfully!");
       setResumes((prev) => prev.filter((file) => file.key !== fileName));
+
+      // Clear preview if the deleted resume was being viewed
+      if (previewUrl && previewUrl.includes(fileName)) {
+        setPreviewUrl(null);
+      }
     } catch (error) {
-      console.error("🔥 Delete error:", error);
-      alert("Failed to delete resume.");
+      console.error("Delete error:", error);
+      toast.error("Failed to delete resume.");
     }
+  };
+
+  const handlePreviewResume = (resumeUrl: string) => {
+    setPreviewUrl(resumeUrl);
   };
 
   return (
@@ -112,10 +130,16 @@ export default function ResumeSection() {
         {resumes.length > 0 ? (
           resumes.map((resume) => (
             <li key={resume.key} className="flex justify-between items-center border-b pb-2">
-              <a href={resume.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+              <button
+                onClick={() => handlePreviewResume(resume.url)}
+                className="text-blue-600 hover:underline"
+              >
                 {resume.key.split("/").pop()}
-              </a>
-              <button onClick={() => handleDeleteResume(resume.key)} className="text-red-500 hover:text-red-700 transition">
+              </button>
+              <button
+                onClick={() => handleDeleteResume(resume.key)}
+                className="text-red-500 hover:text-red-700 transition"
+              >
                 <FaTrash />
               </button>
             </li>
@@ -125,17 +149,51 @@ export default function ResumeSection() {
         )}
       </ul>
 
-      {/* File Upload Input */}
+      {/* File Upload Input  */}
       <div className="flex items-center mt-4">
         <input type="file" accept="application/pdf" onChange={handleFileChange} className="border rounded p-2 w-full" />
         <button
           onClick={handleUpload}
           disabled={uploading}
-          className={`ml-2 px-3 py-1 text-sm text-white rounded flex items-center ${uploading ? "bg-gray-400" : "bg-green-500"}`}
+          className={`ml-2 px-3 py-1 text-sm text-white rounded flex items-center ${
+            uploading ? "bg-gray-400" : "bg-green-500"
+          }`}
         >
-          {uploading ? "Uploading..." : <><FaPlus className="mr-1" /> Upload</>}
+          {uploading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" /> Uploading...
+            </>
+          ) : (
+            <>
+              <FaPlus className="mr-1" /> Upload
+            </>
+          )}
         </button>
       </div>
+
+      {/* Resume Preview Section */}
+      {previewUrl && (
+        <div className="mt-6 border rounded-lg overflow-hidden">
+          <h3 className="text-lg font-semibold mb-2">Resume Preview</h3>
+          <object
+            data={previewUrl}
+            type="application/pdf"
+            className="w-full h-96"
+          >
+            <p>
+              Unable to display PDF.{" "}
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 text-blue-600 hover:underline"
+              >
+                Open in new tab
+              </a>
+            </p>
+          </object>
+        </div>
+      )}
     </div>
   );
 }

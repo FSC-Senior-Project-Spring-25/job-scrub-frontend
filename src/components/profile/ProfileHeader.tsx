@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { FaEdit, FaUserCircle } from "react-icons/fa";
 
-// ✅ Define Props for ProfileHeader
+// Define Props for ProfileHeader
 interface ProfileHeaderProps {
   formData: {
     username: string;
@@ -37,32 +37,32 @@ export default function ProfileHeader({
 }: ProfileHeaderProps) {
   const [showPicker, setShowPicker] = useState(false);
 
-  // ✅ Emoji List
+  
   const emojis = ["😀", "😎", "🤓", "👨‍💻", "👩‍💻", "👨‍🎓", "👩‍🎓", "🦸", "🧑‍🚀", "🧑‍🎨"];
 
-  // ✅ Handle Emoji Selection
+  
   const handleEmojiSelect = (emoji: string) => {
     setFormData((prev) => ({
       ...prev,
-      profileIcon: emoji, // ✅ Updates profile icon in state
+      profileIcon: emoji, // Updates profile icon in state
     }));
-    setShowPicker(false); // ✅ Hides picker after selection
+    setShowPicker(false); // Hides picker after selection
   };
 
   return (
     <div className="flex flex-col md:flex-row items-center gap-6 border-b pb-6 bg-white p-10 rounded-lg w-full max-w-screen-2xl mx-auto">
       <div className="relative flex-shrink-0">
-        {/* ✅ Profile Icon */}
+        {/*  Profile Icon */}
         <div className="w-52 h-52 bg-gray-300 rounded-full flex items-center justify-center text-9xl cursor-pointer relative">
           {formData.profileIcon || <FaUserCircle className="text-gray-500 text-9xl" />}
           
-          {/* ✅ Edit Icon - Clicking toggles emoji picker */}
+          {/*  Edit Icon - Clicking toggles emoji picker */}
           <div className="absolute bottom-3 right-3 bg-white p-2 rounded-full shadow-lg cursor-pointer"
                onClick={() => setShowPicker(!showPicker)}>
             <FaEdit className="text-gray-600 text-2xl" />
           </div>
 
-          {/* ✅ Emoji Picker */}
+          {/*  Emoji Picker */}
           {showPicker && (
             <div className="absolute mt-2 bg-white border p-4 rounded shadow grid grid-cols-5 gap-3 text-center w-64 max-w-xs overflow-auto">
               {emojis.map((emoji, index) => (
@@ -85,7 +85,7 @@ export default function ProfileHeader({
         </div>
       </div>
 
-      {/* ✅ Editable User Details */}
+      {/*  Editable User Details */}
       <div className="flex flex-col justify-center md:justify-start text-center md:text-left w-full">
         {/* Editable Username */}
         {editing ? (
@@ -94,7 +94,7 @@ export default function ProfileHeader({
             name="username"
             value={formData.username}
             onChange={(e) => setFormData((prev) => ({ ...prev, username: e.target.value }))}
-            placeholder="Enter your name"
+            placeholder="Enter your name!"
             className="border rounded p-2 text-4xl font-bold"
           />
         ) : (
