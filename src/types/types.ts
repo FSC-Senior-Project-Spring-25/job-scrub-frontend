@@ -16,11 +16,27 @@ export interface JobReport {
   title: string;
   company: string;
   url: string;
-  date?: string;
-  description?: string;
+  date: string;
+  description: string;
   salary?: string;
+  benefits: string[];
+  skills: string[];
+  location: string;
+  job_type: string;
+}
+
+export interface Job {
+  company: string;
+  date: string;
+  description: string;
+  job_type: string;
+  lat: number;
+  location: string;
+  lon: number;
+  salary: string;
+  skills: string[];
   benefits?: string[];
-  skills?: string[];
-  location?: string;
-  job_type?: string;
+  title: string;
+  url: string;
+  verified: boolean;
 }

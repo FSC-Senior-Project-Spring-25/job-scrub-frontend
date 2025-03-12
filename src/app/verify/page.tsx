@@ -45,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { JobReport } from "@/types/types";
 
 const formSchema = z.object({
   title: z.string().min(1, {
@@ -86,20 +87,6 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-type Job = {
-  company: string;
-  date: string;
-  description: string;
-  job_type: string;
-  location: string;
-  salary: string;
-  skills: string[];
-  benefits?: string[];
-  title: string;
-  url: string;
-  verified: boolean;
-};
-
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -112,7 +99,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 }
 
 export default function VerifyPage() {
-  const [unverifiedJobs, setUnverifiedJobs] = useState<Record<string, Job>>({});
+  const [unverifiedJobs, setUnverifiedJobs] = useState<Record<string, JobReport>>({});
   const { user } = useAuth();
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -160,7 +147,7 @@ export default function VerifyPage() {
     }
   };
 
-  const updateFormWithJobData = (job: Job) => {
+  const updateFormWithJobData = (job: JobReport) => {
     // Convert job_type to enum value if it exists
     let jobType:
       | "fulltime"
