@@ -5,25 +5,10 @@ import {  useEffect, useState } from 'react';
 import { FaSearch } from 'react-icons/fa';
 
 
-import { useAuth } from './AuthContext';
-import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
   const [search, setSearch] = useState('');
-  const router = useRouter();
- 
-  // code to check if the user is logged in 
-  const {user} = useAuth(); // user object contains information about the user 
 
-
-  // redirecting the user to the login page if not logged in
-  useEffect(()=>{
-    if(!user)  router.push("/login");
-  });
-
-
-  if(!user) return null; // prevents ui flickering 
-// end of code to check if the user is logged in 
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center">     

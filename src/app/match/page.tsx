@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
 import { useDropzone } from "react-dropzone"
-import { UploadCloud } from "lucide-react"
-import type { MatchResponse, SimilarityDetail } from "@/types/types"
+import { useState,useEffect } from "react"
+import { MatchResponse, SimilarityDetail } from "@/types/types"
+import { useAuth } from "../AuthContext"
+import { useRouter } from "next/navigation"
+import FileUpload from "@/components/file-upload"
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null)
@@ -11,6 +13,21 @@ export default function Home() {
   const [matchResult, setMatchResult] = useState<MatchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const router = useRouter();
+
+  // code to check if the user is logged in 
+  const {user} = useAuth(); // user object contains information about the user 
+
+
+  // redirecting the user to the login page if not logged in
+  useEffect(()=>{
+    if(!user)  router.push("/login");
+  });
+
+
+  if(!user) return null; // prevents ui flickering 
+// end of code to check if the user is logged in 
 
   const { getRootProps, getInputProps } = useDropzone({
     accept: { "application/pdf": [".pdf"] },
@@ -60,15 +77,11 @@ export default function Home() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mb-6">
         {/* Resume Upload Box */}
-        <div
-          className="p-6 flex flex-col items-center justify-center border-dashed border-2 border-gray-300 rounded-lg cursor-pointer h-60 bg-white"
-          {...getRootProps()}
-        >
-          <input {...getInputProps()} />
-          <UploadCloud className="w-12 h-12 text-gray-500 mb-2" />
-          <p className="text-gray-700">Drag & drop your resume here or click to upload</p>
-          {file && <p className="mt-2 text-sm text-gray-500">{file.name}</p>}
-        </div>
+        <FileUpload 
+          onFileChange={setFile}
+          label="Upload Resume"
+          description="Drag & drop your resume here or click to upload"
+        />
 
         {/* Job Description Box */}
         <textarea
@@ -160,4 +173,3 @@ export default function Home() {
     </div>
   )
 }
-
