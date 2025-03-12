@@ -13,7 +13,7 @@ export const GET = async (req: NextRequest) => {
         );
       }
 
-      const response = await fetch(`${process.env.API_URL}/view-resume?key=${encodeURIComponent(key)}`, {
+      const response = await fetch(`${process.env.API_URL}/resume/view?key=${encodeURIComponent(key)}`, {
         method: 'GET',
         headers: {
           'Authorization': req.headers.get('Authorization') || '',

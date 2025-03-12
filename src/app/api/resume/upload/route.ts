@@ -13,7 +13,7 @@ export const POST = async (req: NextRequest) => {
         );
       }
 
-      const response = await fetch(`${process.env.API_URL}/upload-resume`, {
+      const response = await fetch(`${process.env.API_URL}/resume/upload`, {
         method: 'POST',
         body: formData,
         headers: {
