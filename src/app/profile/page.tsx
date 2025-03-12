@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { auth, db } from "@/app/firebase";  // 
+import { auth, db } from "@/app/firebase";
 import { doc, getDoc, updateDoc, arrayRemove } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import EducationSection from "@/components/profile/EducationSection";  
-import ExperienceSection from "@/components/profile/ExperienceSection";  
-import ResumeSection from "@/components/profile/ResumeSection";  
-import ProfileHeader from "@/components/profile/ProfileHeader";  
-import ResumeManager from "@/components/resume-manager";
+import EducationSection from "@/components/profile/EducationSection";
+import ExperienceSection from "@/components/profile/ExperienceSection";
+import ResumeSection from "@/components/profile/ResumeSection";
+import ProfileHeader from "@/components/profile/ProfileHeader";
 import { useAuth } from "../AuthContext";
+
 // Define TypeScript Interface for Form Data
 interface FormData {
   username: string;
@@ -150,7 +150,16 @@ export default function ProfilePage() {
   };
 
   if (!user) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <div className="animate-pulse text-center">
+          <h2 className="text-2xl font-semibold mb-2">Loading profile...</h2>
+          <p className="text-muted-foreground">
+            Please wait while we load your profile data
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -164,12 +173,11 @@ export default function ProfilePage() {
         handleSave={handleSave}  
       />
 
-      {/*Ensure Correct Profile Sections */}
+      {/* Profile Sections */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 w-full max-w-screen-2xl mx-auto">
         <EducationSection formData={formData} setFormData={setFormData} onDeleteEducation={handleDeleteEducation} />
         <ExperienceSection formData={formData} setFormData={setFormData} onDeleteExperience={handleDeleteExperience} />
-        {/* <ResumeSection /> */}
-        <ResumeManager user={user} />
+        <ResumeSection user={user} />
       </div>
     </div>
   );
