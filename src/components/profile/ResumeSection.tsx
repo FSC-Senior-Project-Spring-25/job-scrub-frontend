@@ -15,15 +15,14 @@ export default function ResumeSection() {
   const [file, setFile] = useState<File | null>(null);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   //  Fetch uploaded resumes from backend
-  const fetchResumes = async () => {
+  const fetchResumes = async (resumeKey: string) => {
     if (!auth.currentUser) return;
 
     try {
       const token = await auth.currentUser.getIdToken();
-      const response = await fetch("/api/get-resumes", {
+      const response = await fetch(`/api/resume/view?key=${encodeURIComponent(resumeKey)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -37,11 +36,11 @@ export default function ResumeSection() {
     }
   };
 
-  useEffect(() => {
-    if (auth.currentUser) {
-      fetchResumes();
-    }
-  }, []);
+  // useEffect(() => {
+  //   if (auth.currentUser) {
+  //     fetchResumes();
+  //   }
+  // }, []);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -72,8 +71,7 @@ export default function ResumeSection() {
     setUploading(true);
 
     try {
-      console.log(" Uploading file:", file.name);
-      const response = await fetch("/api/upload-resume", {
+      const response = await fetch("/api/resume/upload", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -82,7 +80,10 @@ export default function ResumeSection() {
       if (!response.ok) throw new Error("Upload failed");
 
       toast.success(" Resume uploaded successfully!");
-      fetchResumes();
+
+      const data = await response.json();
+      const resumeKey = data.file_id
+      fetchResumes(resumeKey);
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Failed to upload resume.");

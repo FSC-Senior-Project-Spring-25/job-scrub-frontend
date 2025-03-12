@@ -8,6 +8,8 @@ import EducationSection from "@/components/profile/EducationSection";
 import ExperienceSection from "@/components/profile/ExperienceSection";  
 import ResumeSection from "@/components/profile/ResumeSection";  
 import ProfileHeader from "@/components/profile/ProfileHeader";  
+import ResumeManager from "@/components/resume-manager";
+import { useAuth } from "../AuthContext";
 // Define TypeScript Interface for Form Data
 interface FormData {
   username: string;
@@ -21,7 +23,8 @@ interface FormData {
 }
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<any>(null);
+  const { user } = useAuth();
+  const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   
@@ -46,7 +49,7 @@ export default function ProfilePage() {
 
         if (userSnap.exists()) {
           const userData = userSnap.data();
-          setUser(userData);
+          setUserData(userData);
           setFormData({
             username: userData.username || "",
             email: userData.email || auth.currentUser?.email || "",
@@ -146,6 +149,10 @@ export default function ProfilePage() {
     }
   };
 
+  if (!user) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="p-6 w-full bg-gray-100 shadow-md rounded-lg min-h-screen flex flex-col">
       {/* Profile Header */}
@@ -161,7 +168,8 @@ export default function ProfilePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 w-full max-w-screen-2xl mx-auto">
         <EducationSection formData={formData} setFormData={setFormData} onDeleteEducation={handleDeleteEducation} />
         <ExperienceSection formData={formData} setFormData={setFormData} onDeleteExperience={handleDeleteExperience} />
-        <ResumeSection />
+        {/* <ResumeSection /> */}
+        <ResumeManager user={user} />
       </div>
     </div>
   );
