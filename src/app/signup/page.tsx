@@ -10,7 +10,7 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
   const router = useRouter();
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -26,6 +26,11 @@ export default function Signup() {
       return;
     }
 
+    if (password.length < 6 || !/\d/.test(password)) {
+      setError('Password must be at least 6 characters long and include at least one number.');
+      return;
+    }
+
     try {
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -34,13 +39,21 @@ export default function Signup() {
       await setDoc(doc(db, 'users', user.uid), {
         email,
         createdAt: new Date(),
+        isAdmin: false
       });
 
       // redirecting to login page after successful signup
       router.push('/login'); 
-    } catch (err) {
+
+      console.log('just after the login line');
+    } catch (err:any) {
+      console.log(err);
+      if(err.code == 'auth/email-already-in-use'){
+       setError('A user with this email already exists');
+      }
+      else{
       setError('Error signing up. Please try again.');
-      console.error(err);
+      }
     }
   };
 

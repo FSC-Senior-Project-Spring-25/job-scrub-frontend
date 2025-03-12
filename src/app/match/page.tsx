@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState,useEffect } from "react"
 import { useDropzone } from "react-dropzone"
 import { UploadCloud } from "lucide-react"
 import type { MatchResponse, SimilarityDetail } from "@/types/types"
+import { useAuth } from "../AuthContext"
+import { useRouter } from "next/navigation"
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null)
@@ -11,6 +13,21 @@ export default function Home() {
   const [matchResult, setMatchResult] = useState<MatchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const router = useRouter();
+
+  // code to check if the user is logged in 
+  const {user} = useAuth(); // user object contains information about the user 
+
+
+  // redirecting the user to the login page if not logged in
+  useEffect(()=>{
+    if(!user)  router.push("/login");
+  });
+
+
+  if(!user) return null; // prevents ui flickering 
+// end of code to check if the user is logged in 
 
   const { getRootProps, getInputProps } = useDropzone({
     accept: { "application/pdf": [".pdf"] },

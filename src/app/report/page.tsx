@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -16,6 +16,9 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "../AuthContext";
+import { useRouter } from "next/navigation";
+
 
 const formSchema = z.object({
   title: z.string().min(1, {
@@ -46,6 +49,16 @@ export default function ReportPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [skillInput, setSkillInput] = useState("");
   const [benefitInput, setBenefitInput] = useState("");
+
+  const router = useRouter();
+  const {user} = useAuth();
+
+    // redirecting the user to the login page if not logged in
+    useEffect(()=>{
+      if(!user)  router.push("/login");
+    });
+
+  if(!user) return null;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { FaUser, FaBars, FaTimes } from 'react-icons/fa';
-import { useAuth } from '@/app/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/app/firebase';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/app/AuthContext';
 
 interface NavItem {
   href: string;
@@ -23,17 +24,20 @@ const defaultNavItems: NavItem[] = [
   { href: '/connect', label: 'Connect with others' },
 ];
 
-
-    const logout = async()=>{
-        await signOut(auth);
-      
-    }
     
 
 export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+
+  const {user} = useAuth();
+  const router = useRouter();
+   const logout = async()=>{
+       await signOut(auth);
+        router.push("/login");
+      
+   }
 
   return (
     <nav className="w-full bg-white shadow-md">
@@ -56,17 +60,21 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
             </div>
           </div>
           <div className="flex items-center">
-            <Link
+
+            {/* Displaying the signin and signout button if the user is logged in or logged out */}
+            {
+              user ? 
+           <button onClick={logout}className="hidden ml-3 sm:flex text-gray-700 hover:text-green-600 transition-colors items-center whitespace-nowrap">
+              <FaUser className="mr-2" />
+              <span>Sign Out</span>
+           </button> :
+              <Link
               href="/login"
-              className="hidden sm:flex text-gray-700 hover:text-green-600 transition-colors items-center whitespace-nowrap"
-            >
+              className="hidden sm:flex text-gray-700 hover:text-green-600 transition-colors items-center whitespace-nowrap" >
               <FaUser className="mr-2" />
               <span>Sign In</span>
             </Link>
-           <button onClick={logout}className="hidden ml-3 sm:flex text-gray-700 hover:text-green-600 transition-colors items-center whitespace-nowrap"
->
-              <span>Sign Out</span>
-           </button> 
+            }
             <button
               onClick={toggleMenu}
               className="sm:hidden text-gray-700 hover:text-green-600 transition-colors ml-4"
@@ -90,6 +98,14 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                 {item.label}
               </Link>
             ))}
+
+            {
+              user ? 
+           <button onClick={logout}className="text-gray-700 hover:text-green-600 transition-colors flex items-center px-3 py-2">
+              <FaUser className="mr-2" />
+              <span>Sign Out</span>
+           </button> 
+           :
             <Link
               href="/login"
               className="text-gray-700 hover:text-green-600 transition-colors flex items-center px-3 py-2"
@@ -98,6 +114,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
               <FaUser className="mr-2" />
               <span>Sign In</span>
             </Link>
+            }
           </div>
         </div>
       )}
