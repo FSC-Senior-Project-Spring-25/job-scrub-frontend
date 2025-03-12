@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Heart, MessageSquare, Plus, Send } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "../AuthContext";
-import { toast } from "sonner"
+import { toast } from "sonner";
+import ProtectedRoute from "@/components/protected-route";
 
 interface Comment {
   id: string;
@@ -126,7 +127,7 @@ export default function ConnectFeed() {
     if (!user || !newPostContent.trim()) {
       return; // Don't post if not logged in or content is empty
     }
-    
+
     const tempId = `temp-${Date.now()}`; // Create a temporary ID
     const newPost = {
       id: tempId,
@@ -135,46 +136,46 @@ export default function ConnectFeed() {
       created_at: new Date().toISOString(),
       likes: 0,
       comments: [],
-      userHasLiked: false
+      userHasLiked: false,
     };
-    
+
     // Optimistically update UI first
-    setPosts(currentPosts => [newPost, ...currentPosts]);
-    
+    setPosts((currentPosts) => [newPost, ...currentPosts]);
+
     // Clear the textarea immediately for better UX
     setNewPostContent("");
-    
+
     try {
       const token = await user.getIdToken();
-      
-      const response = await fetch("/api/posts", { 
+
+      const response = await fetch("/api/posts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           author: user.email || "Anonymous",
           content: newPost.content,
-          created_at: newPost.created_at
-        })
+          created_at: newPost.created_at,
+        }),
       });
-      
+
       if (!response.ok) {
         // If the request fails, remove the temporary post
-        setPosts(currentPosts => currentPosts.filter(post => post.id !== tempId));
+        setPosts((currentPosts) =>
+          currentPosts.filter((post) => post.id !== tempId)
+        );
         throw new Error("Failed to create post");
       }
-      
+
       const result = await response.json();
       console.log("Post created:", result);
-  
+
       // Update the temporary post with the real server data
       // This makes sure our local state matches the server state
-      setPosts(currentPosts => 
-        currentPosts.map(post => 
-          post.id === tempId ? { ...result } : post
-        )
+      setPosts((currentPosts) =>
+        currentPosts.map((post) => (post.id === tempId ? { ...result } : post))
       );
     } catch (error) {
       console.error("Error creating post:", error);
@@ -242,157 +243,153 @@ export default function ConnectFeed() {
     }
   }
 
-  if (!user) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <p className="text-xl text-gray-500">
-          Please log in to view and interact with posts
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-5xl mx-auto p-6 flex flex-col md:flex-row gap-6">
-      {/* Left Sidebar - User Info */}
-      <div className="w-full md:w-1/4 bg-white shadow-md rounded-lg p-4 mb-4 md:mb-0">
-        <div className="flex flex-col items-center">
-          <div className="w-20 h-20 bg-gray-300 rounded-full mb-3"></div>
-          <p className="font-semibold">
-            {user.displayName || user.email || "User"}
-          </p>
-          <p className="text-sm text-gray-500">
-            Member since:{" "}
-            {format(
-              new Date(user.metadata?.creationTime || Date.now()),
-              "yyyy"
-            )}
-          </p>
-        </div>
-      </div>
+    <ProtectedRoute>
+      {user && (
+        <div className="max-w-5xl mx-auto p-6 flex flex-col md:flex-row gap-6">
+          {/* Left Sidebar - User Info */}
+          <div className="w-full md:w-1/4 bg-white shadow-md rounded-lg p-4 mb-4 md:mb-0">
+            <div className="flex flex-col items-center">
+              <div className="w-20 h-20 bg-gray-300 rounded-full mb-3"></div>
+              <p className="font-semibold">
+                {user.displayName || user.email || "User"}
+              </p>
+              <p className="text-sm text-gray-500">
+                Member since:{" "}
+                {format(
+                  new Date(user.metadata?.creationTime || Date.now()),
+                  "yyyy"
+                )}
+              </p>
+            </div>
+          </div>
 
-      {/* Main Feed */}
-      <div className="w-full md:w-3/4">
-        <div className="bg-white p-4 rounded-lg shadow-md mb-4">
-          <h2 className="text-lg font-semibold">What's on your mind?</h2>
-          <textarea
-            className="w-full mt-2 p-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-            rows={3}
-            value={newPostContent}
-            onChange={(e) => setNewPostContent(e.target.value)}
-            placeholder="Share your thoughts..."
-            onKeyDown={(e) => e.key === "Enter" && handleAddPost()}
-          />
-          <Button
-            className="w-full mt-3 flex items-center justify-center gap-2 bg-green-500 text-white"
-            onClick={handleAddPost}
-            disabled={!newPostContent.trim()}
-          >
-            <Plus className="w-4 h-4" /> Add Post
-          </Button>
-        </div>
+          {/* Main Feed */}
+          <div className="w-full md:w-3/4">
+            <div className="bg-white p-4 rounded-lg shadow-md mb-4">
+              <h2 className="text-lg font-semibold">What's on your mind?</h2>
+              <textarea
+                className="w-full mt-2 p-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                rows={3}
+                value={newPostContent}
+                onChange={(e) => setNewPostContent(e.target.value)}
+                placeholder="Share your thoughts..."
+                onKeyDown={(e) => e.key === "Enter" && handleAddPost()}
+              />
+              <Button
+                className="w-full mt-3 flex items-center justify-center gap-2 bg-green-500 text-white"
+                onClick={handleAddPost}
+                disabled={!newPostContent.trim()}
+              >
+                <Plus className="w-4 h-4" /> Add Post
+              </Button>
+            </div>
 
-        {loading ? (
-          <p>Loading posts...</p>
-        ) : posts.length === 0 ? (
-          <p className="text-center text-gray-500 py-8">
-            No posts yet. Be the first to share something!
-          </p>
-        ) : (
-          posts.map((post) => (
-            <Card key={post.id} className="mb-4">
-              <CardContent className="p-4">
-                <p className="font-semibold">{post.author}</p>
-                <p className="text-gray-700 mt-2 whitespace-pre-wrap">
-                  {post.content}
-                </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  {format(new Date(post.created_at), "PPP")}
-                </p>
-                <div className="flex items-center gap-4 mt-3">
-                  <Button
-                    variant={post.userHasLiked ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => toggleLike(post.id)}
-                    className={
-                      post.userHasLiked
-                        ? "bg-pink-100 text-pink-500 hover:bg-pink-200"
-                        : ""
-                    }
-                  >
-                    <Heart
-                      className={`w-4 h-4 mr-1 ${
-                        post.userHasLiked ? "fill-pink-500 text-pink-500" : ""
-                      }`}
-                    />
-                    {post.likes || 0}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleCommentSection(post.id)}
-                  >
-                    <MessageSquare className="w-4 h-4 mr-1" />
-                    {post.comments?.length || 0}
-                  </Button>
-                </div>
-
-                {showComments[post.id] && (
-                  <div className="mt-4 border-t pt-3">
-                    <div className="flex gap-2 mb-3">
-                      <input
-                        type="text"
-                        placeholder="Write a comment..."
-                        className="flex-grow p-2 text-sm border rounded"
-                        value={commentInputs[post.id] || ""}
-                        onChange={(e) =>
-                          handleCommentInputChange(post.id, e.target.value)
-                        }
-                        onKeyPress={(e) =>
-                          e.key === "Enter" && submitComment(post.id)
-                        }
-                      />
+            {loading ? (
+              <p>Loading posts...</p>
+            ) : posts.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">
+                No posts yet. Be the first to share something!
+              </p>
+            ) : (
+              posts.map((post) => (
+                <Card key={post.id} className="mb-4">
+                  <CardContent className="p-4">
+                    <p className="font-semibold">{post.author}</p>
+                    <p className="text-gray-700 mt-2 whitespace-pre-wrap">
+                      {post.content}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {format(new Date(post.created_at), "PPP")}
+                    </p>
+                    <div className="flex items-center gap-4 mt-3">
                       <Button
+                        variant={post.userHasLiked ? "default" : "ghost"}
                         size="sm"
-                        onClick={() => submitComment(post.id)}
-                        disabled={!commentInputs[post.id]?.trim()}
+                        onClick={() => toggleLike(post.id)}
+                        className={
+                          post.userHasLiked
+                            ? "bg-pink-100 text-pink-500 hover:bg-pink-200"
+                            : ""
+                        }
                       >
-                        <Send className="w-4 h-4" />
+                        <Heart
+                          className={`w-4 h-4 mr-1 ${
+                            post.userHasLiked
+                              ? "fill-pink-500 text-pink-500"
+                              : ""
+                          }`}
+                        />
+                        {post.likes || 0}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleCommentSection(post.id)}
+                      >
+                        <MessageSquare className="w-4 h-4 mr-1" />
+                        {post.comments?.length || 0}
                       </Button>
                     </div>
 
-                    {post.comments && post.comments.length > 0 ? (
-                      post.comments.map((comment, idx) => (
-                        <div
-                          key={comment.id || idx}
-                          className="border-b last:border-0 py-2"
-                        >
-                          <div className="flex justify-between">
-                            <p className="text-sm font-medium">
-                              {comment.author}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {format(
-                                new Date(comment.created_at),
-                                "MMM d, h:mm a"
-                              )}
-                            </p>
-                          </div>
-                          <p className="text-sm mt-1">{comment.text}</p>
+                    {showComments[post.id] && (
+                      <div className="mt-4 border-t pt-3">
+                        <div className="flex gap-2 mb-3">
+                          <input
+                            type="text"
+                            placeholder="Write a comment..."
+                            className="flex-grow p-2 text-sm border rounded"
+                            value={commentInputs[post.id] || ""}
+                            onChange={(e) =>
+                              handleCommentInputChange(post.id, e.target.value)
+                            }
+                            onKeyPress={(e) =>
+                              e.key === "Enter" && submitComment(post.id)
+                            }
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => submitComment(post.id)}
+                            disabled={!commentInputs[post.id]?.trim()}
+                          >
+                            <Send className="w-4 h-4" />
+                          </Button>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-gray-500">
-                        No comments yet. Be the first to comment!
-                      </p>
+
+                        {post.comments && post.comments.length > 0 ? (
+                          post.comments.map((comment, idx) => (
+                            <div
+                              key={comment.id || idx}
+                              className="border-b last:border-0 py-2"
+                            >
+                              <div className="flex justify-between">
+                                <p className="text-sm font-medium">
+                                  {comment.author}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {format(
+                                    new Date(comment.created_at),
+                                    "MMM d, h:mm a"
+                                  )}
+                                </p>
+                              </div>
+                              <p className="text-sm mt-1">{comment.text}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500">
+                            No comments yet. Be the first to comment!
+                          </p>
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </ProtectedRoute>
   );
 }

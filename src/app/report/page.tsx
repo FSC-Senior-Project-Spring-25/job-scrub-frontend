@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import ProtectedRoute from "@/components/protected-route";
 
 const formSchema = z.object({
   title: z.string().min(1, {
@@ -56,23 +57,26 @@ const formSchema = z.object({
   skills: z.array(z.string()).min(1, {
     message: "At least one skill is required.",
   }),
-  location: z.string().min(1, {
-    message: "Location is required.",
-  }).refine(
-    (val) => /^[A-Za-z\s]+(,\s*[A-Za-z\s]+)+$/.test(val),
-    {
+  location: z
+    .string()
+    .min(1, {
+      message: "Location is required.",
+    })
+    .refine((val) => /^[A-Za-z\s]+(,\s*[A-Za-z\s]+)+$/.test(val), {
       message: "Location must be in 'City, State' format.",
-    }
-  ),
-  job_type: z.enum(["fulltime", "parttime", "contract", "freelance", "internship"])
+    }),
+  job_type: z.enum([
+    "fulltime",
+    "parttime",
+    "contract",
+    "freelance",
+    "internship",
+  ]),
 });
 
-function debounce<F extends (...args: any[]) => any>(
-  func: F,
-  waitFor: number
-) {
+function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
-  
+
   return (...args: Parameters<F>): void => {
     if (timeout !== null) {
       clearTimeout(timeout);
@@ -167,11 +171,11 @@ export default function ReportPage() {
         setLocationSuggestions([]);
         return;
       }
-  
+
       // Create a request ID to handle race conditions
       const requestId = Date.now();
       (fetchLocationSuggestions as any).lastRequestId = requestId;
-  
+
       setIsValidatingLocation(true);
       try {
         const response = await fetch(
@@ -179,12 +183,12 @@ export default function ReportPage() {
             query
           )}&limit=5&addressdetails=1`
         );
-  
+
         // Only process if this is still the most recent request
         if ((fetchLocationSuggestions as any).lastRequestId !== requestId) {
           return;
         }
-  
+
         if (response.ok) {
           const data = await response.json();
           const suggestions = data
@@ -198,7 +202,7 @@ export default function ReportPage() {
               return city && state ? `${city}, ${state}` : "";
             })
             .filter(Boolean);
-  
+
           setLocationSuggestions([...new Set(suggestions)] as string[]);
         }
       } catch (error) {
@@ -213,320 +217,325 @@ export default function ReportPage() {
   );
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <h2 className="text-2xl font-bold mb-6 text-center">Add Job Posting</h2>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          <div className="flex flex-col md:flex-row gap-8">
-            <div className="flex-1 space-y-8">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Job Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter job title" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="company"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter company name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="url"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Job URL</FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://example.com/job" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date Posted</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) =>
-                            date > new Date() || date < new Date("1900-01-01")
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="flex-1 space-y-8">
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem className="relative">
-                    <FormLabel>Location</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter city, state"
-                        {...field}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          fetchLocationSuggestions(e.target.value);
-                          setShowSuggestions(true);
-                        }}
-                        onBlur={() => {
-                          field.onBlur();
-                          // Delay hiding suggestions to allow for clicks
-                          setTimeout(() => setShowSuggestions(false), 200);
-                        }}
-                        onFocus={() => {
-                          if (field.value && locationSuggestions.length > 0) {
-                            setShowSuggestions(true);
-                          }
-                        }}
-                      />
-                    </FormControl>
-                    {isValidatingLocation && (
-                      <div className="absolute right-3 top-9">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      </div>
-                    )}
-                    {showSuggestions && locationSuggestions.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
-                        {locationSuggestions.map((suggestion, index) => (
-                          <div
-                            key={index}
-                            className="p-2 hover:bg-muted cursor-pointer"
-                            onClick={() => {
-                              form.setValue("location", suggestion);
-                              setShowSuggestions(false);
-                            }}
-                          >
-                            {suggestion}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <FormDescription>
-                      Enter a valid city and state (e.g., "San Francisco, CA")
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="job_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Job Type</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
+    <ProtectedRoute>
+      <div className="max-w-5xl mx-auto p-6">
+        <h2 className="text-2xl font-bold mb-6 text-center">Add Job Posting</h2>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <div className="flex flex-col md:flex-row gap-8">
+              <div className="flex-1 space-y-8">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Job Title</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a job type" />
-                        </SelectTrigger>
+                        <Input placeholder="Enter job title" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="fulltime">Full Time</SelectItem>
-                        <SelectItem value="parttime">Part Time</SelectItem>
-                        <SelectItem value="contract">Contract</SelectItem>
-                        <SelectItem value="freelance">Freelance</SelectItem>
-                        <SelectItem value="internship">Internship</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="salary"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Salary</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., $50k-$70k" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="benefits"
-                render={({ field }) => (
-                  <FormItem style={{ marginTop: "22px" }}>
-                    <FormLabel>Benefits</FormLabel>
-                    <FormControl>
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Add a benefit"
-                            value={benefitInput}
-                            onChange={(e) => setBenefitInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                addBenefit();
-                              }
-                            }}
-                          />
-                          <Button type="button" onClick={addBenefit}>
-                            Add
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {field.value.map((benefit, index) => (
-                            <span
-                              key={index}
-                              className="bg-primary text-primary-foreground px-2 py-1 rounded-full text-sm flex items-center"
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="company"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter company name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Job URL</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="https://example.com/job"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Date Posted</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
                             >
-                              {benefit}
-                              <button
-                                type="button"
-                                onClick={() => removeBenefit(benefit)}
-                                className="ml-2 focus:outline-none"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </span>
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) =>
+                              date > new Date() || date < new Date("1900-01-01")
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex-1 space-y-8">
+                <FormField
+                  control={form.control}
+                  name="location"
+                  render={({ field }) => (
+                    <FormItem className="relative">
+                      <FormLabel>Location</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter city, state"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            fetchLocationSuggestions(e.target.value);
+                            setShowSuggestions(true);
+                          }}
+                          onBlur={() => {
+                            field.onBlur();
+                            // Delay hiding suggestions to allow for clicks
+                            setTimeout(() => setShowSuggestions(false), 200);
+                          }}
+                          onFocus={() => {
+                            if (field.value && locationSuggestions.length > 0) {
+                              setShowSuggestions(true);
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      {isValidatingLocation && (
+                        <div className="absolute right-3 top-9">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        </div>
+                      )}
+                      {showSuggestions && locationSuggestions.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                          {locationSuggestions.map((suggestion, index) => (
+                            <div
+                              key={index}
+                              className="p-2 hover:bg-muted cursor-pointer"
+                              onClick={() => {
+                                form.setValue("location", suggestion);
+                                setShowSuggestions(false);
+                              }}
+                            >
+                              {suggestion}
+                            </div>
                           ))}
                         </div>
-                      </div>
-                    </FormControl>
-                    <FormDescription>
-                      Press Enter or click Add to add a benefit
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      )}
+                      <FormDescription>
+                        Enter a valid city and state (e.g., "San Francisco, CA")
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="job_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Job Type</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a job type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="fulltime">Full Time</SelectItem>
+                          <SelectItem value="parttime">Part Time</SelectItem>
+                          <SelectItem value="contract">Contract</SelectItem>
+                          <SelectItem value="freelance">Freelance</SelectItem>
+                          <SelectItem value="internship">Internship</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="salary"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Salary</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., $50k-$70k" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="benefits"
+                  render={({ field }) => (
+                    <FormItem style={{ marginTop: "22px" }}>
+                      <FormLabel>Benefits</FormLabel>
+                      <FormControl>
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Add a benefit"
+                              value={benefitInput}
+                              onChange={(e) => setBenefitInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  addBenefit();
+                                }
+                              }}
+                            />
+                            <Button type="button" onClick={addBenefit}>
+                              Add
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {field.value.map((benefit, index) => (
+                              <span
+                                key={index}
+                                className="bg-primary text-primary-foreground px-2 py-1 rounded-full text-sm flex items-center"
+                              >
+                                {benefit}
+                                <button
+                                  type="button"
+                                  onClick={() => removeBenefit(benefit)}
+                                  className="ml-2 focus:outline-none"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Press Enter or click Add to add a benefit
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
-          </div>
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Job Description</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Enter job description"
-                    className="min-h-[100px]"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="skills"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Skills Needed</FormLabel>
-                <FormControl>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Add a skill"
-                        value={skillInput}
-                        onChange={(e) => setSkillInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            addSkill();
-                          }
-                        }}
-                      />
-                      <Button type="button" onClick={addSkill}>
-                        Add
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {field.value.map((skill, index) => (
-                        <span
-                          key={index}
-                          className="bg-primary text-primary-foreground px-2 py-1 rounded-full text-sm flex items-center"
-                        >
-                          {skill}
-                          <button
-                            type="button"
-                            onClick={() => removeSkill(skill)}
-                            className="ml-2 focus:outline-none"
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Job Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Enter job description"
+                      className="min-h-[100px]"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="skills"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Skills Needed</FormLabel>
+                  <FormControl>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Add a skill"
+                          value={skillInput}
+                          onChange={(e) => setSkillInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addSkill();
+                            }
+                          }}
+                        />
+                        <Button type="button" onClick={addSkill}>
+                          Add
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {field.value.map((skill, index) => (
+                          <span
+                            key={index}
+                            className="bg-primary text-primary-foreground px-2 py-1 rounded-full text-sm flex items-center"
                           >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </span>
-                      ))}
+                            {skill}
+                            <button
+                              type="button"
+                              onClick={() => removeSkill(skill)}
+                              className="ml-2 focus:outline-none"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </FormControl>
-                <FormDescription>
-                  Press Enter or click Add to add a skill
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <Button type="submit" disabled={isSubmitting} className="w-full">
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              "Submit Job Posting"
-            )}
-          </Button>
-        </form>
-      </Form>
-    </div>
+                  </FormControl>
+                  <FormDescription>
+                    Press Enter or click Add to add a skill
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" disabled={isSubmitting} className="w-full">
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Job Posting"
+              )}
+            </Button>
+          </form>
+        </Form>
+      </div>
+    </ProtectedRoute>
   );
 }

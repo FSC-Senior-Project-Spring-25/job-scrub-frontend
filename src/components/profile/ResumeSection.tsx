@@ -8,6 +8,7 @@ import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { User } from "firebase/auth";
 import FileUpload from "../file-upload";
+import { useAuth } from "@/app/AuthContext";
 
 interface ResumeData {
   success: boolean;
@@ -15,10 +16,10 @@ interface ResumeData {
   file_id: string;
 }
 
-export default function ResumeSection({ user }: { user: User }) {
+export default function ResumeSection() {
+  const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [resumeData, setResumeData] = useState<ResumeData | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resumeId, setResumeId] = useState<string | null>(null);
@@ -123,7 +124,6 @@ export default function ResumeSection({ user }: { user: User }) {
       });
       
       setResumeId(fileId);
-      setResumeData(data);
       toast.success("Resume uploaded successfully!");
       
       // Fetch the preview for the newly uploaded resume
@@ -160,7 +160,6 @@ export default function ResumeSection({ user }: { user: User }) {
       // Reset state
       setResumeId(null);
       setPreviewUrl(null);
-      setResumeData(null);
       
       toast.success("Resume deleted successfully!");
     } catch (error) {

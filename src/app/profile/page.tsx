@@ -8,9 +8,9 @@ import EducationSection from "@/components/profile/EducationSection";
 import ExperienceSection from "@/components/profile/ExperienceSection";
 import ResumeSection from "@/components/profile/ResumeSection";
 import ProfileHeader from "@/components/profile/ProfileHeader";
-import { useAuth } from "../AuthContext";
+import { toast } from "sonner";
+import ProtectedRoute from "@/components/protected-route";
 
-// Define TypeScript Interface for Form Data
 interface FormData {
   username: string;
   email: string;
@@ -23,11 +23,8 @@ interface FormData {
 }
 
 export default function ProfilePage() {
-  const { user } = useAuth();
-  const [userData, setUserData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  
+
   //Form Data State
   const [formData, setFormData] = useState<FormData>({
     username: "",
@@ -49,7 +46,6 @@ export default function ProfilePage() {
 
         if (userSnap.exists()) {
           const userData = userSnap.data();
-          setUserData(userData);
           setFormData({
             username: userData.username || "",
             email: userData.email || auth.currentUser?.email || "",
@@ -64,16 +60,14 @@ export default function ProfilePage() {
       } catch (error) {
         console.error("Error fetching user data:", error);
       } finally {
-        setLoading(false);
       }
     };
 
-    //Firebase auth 
+    //Firebase auth
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         fetchUserData(currentUser.uid);
       } else {
-        setLoading(false);
       }
     });
 
@@ -83,7 +77,7 @@ export default function ProfilePage() {
   // Handle Saving Profile Updates
   const handleSave = async () => {
     if (!auth.currentUser) {
-      alert("User not authenticated!");
+      toast.error("You must be logged in to update your profile.");
       return;
     }
 
@@ -92,14 +86,14 @@ export default function ProfilePage() {
     try {
       await updateDoc(userRef, {
         ...formData,
-        email: auth.currentUser.email, 
+        email: auth.currentUser.email,
       });
 
-      alert("Profile updated successfully!");
+      toast.success("Profile updated successfully!");
       setEditing(false);
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("Failed to update profile.");
+      toast.error("Failed to update profile");
     }
   };
 
@@ -119,8 +113,6 @@ export default function ProfilePage() {
         ...prev,
         education: prev.education.filter((edu) => edu !== educationToRemove),
       }));
-
-      alert("Education entry successfully deleted!");
     } catch (error) {
       console.error(" Error deleting education:", error);
     }
@@ -142,43 +134,38 @@ export default function ProfilePage() {
         ...prev,
         experience: prev.experience.filter((exp) => exp !== experienceToRemove),
       }));
-
-      alert("Experience entry successfully deleted!");
     } catch (error) {
       console.error(" Error deleting experience:", error);
     }
   };
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-[70vh]">
-        <div className="animate-pulse text-center">
-          <h2 className="text-2xl font-semibold mb-2">Loading profile...</h2>
-          <p className="text-muted-foreground">
-            Please wait while we load your profile data
-          </p>
+  return (
+    <ProtectedRoute>
+      <div className="p-6 w-full bg-gray-100 shadow-md rounded-lg min-h-screen flex flex-col">
+        {/* Profile Header */}
+        <ProfileHeader
+          formData={formData}
+          editing={editing}
+          setEditing={setEditing}
+          setFormData={setFormData}
+          handleSave={handleSave}
+        />
+
+        {/* Profile Sections */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 w-full max-w-screen-2xl mx-auto">
+          <EducationSection
+            formData={formData}
+            setFormData={setFormData}
+            onDeleteEducation={handleDeleteEducation}
+          />
+          <ExperienceSection
+            formData={formData}
+            setFormData={setFormData}
+            onDeleteExperience={handleDeleteExperience}
+          />
+          <ResumeSection />
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="p-6 w-full bg-gray-100 shadow-md rounded-lg min-h-screen flex flex-col">
-      {/* Profile Header */}
-      <ProfileHeader
-        formData={formData}
-        editing={editing}
-        setEditing={setEditing}
-        setFormData={setFormData}
-        handleSave={handleSave}  
-      />
-
-      {/* Profile Sections */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 w-full max-w-screen-2xl mx-auto">
-        <EducationSection formData={formData} setFormData={setFormData} onDeleteEducation={handleDeleteEducation} />
-        <ExperienceSection formData={formData} setFormData={setFormData} onDeleteExperience={handleDeleteExperience} />
-        <ResumeSection user={user} />
-      </div>
-    </div>
+    </ProtectedRoute>
   );
 }
