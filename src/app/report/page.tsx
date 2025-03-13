@@ -58,12 +58,30 @@ const formSchema = z.object({
     message: "At least one skill is required.",
   }),
   location: z
-    .string()
-    .min(1, {
-      message: "Location is required.",
+    .object({
+      type: z.enum(["remote", "onsite", "hybrid"]),
+      address: z
+        .string()
+        .optional()
+        .refine(
+          (val) => {
+            // Only validate if it's provided and not remote
+            if (!val) return true;
+            return /^[A-Za-z\s\-\.]+(?:[,]\s*[A-Za-z\s\-\.]+)*$/.test(val);
+          },
+          {
+            message:
+              "Please enter a valid location (e.g., 'City, Country' or 'City, State')",
+          }
+        ),
     })
-    .refine((val) => /^[A-Za-z\s]+(,\s*[A-Za-z\s]+)+$/.test(val), {
-      message: "Location must be in 'City, State' format.",
+    .refine((data) => !(data.type === "hybrid" && !data.address), {
+      message: "Address is required for hybrid positions",
+      path: ["address"],
+    })
+    .refine((data) => !(data.type === "onsite" && !data.address), {
+      message: "Address is required for onsite positions",
+      path: ["address"],
     }),
   job_type: z.enum([
     "fulltime",
@@ -104,17 +122,27 @@ export default function ReportPage() {
       salary: "",
       benefits: [],
       skills: [],
-      location: "Remote",
-      job_type: undefined,
+      location: {
+        type: "onsite",
+        address: "",
+      },
+      job_type: "fulltime",
     },
   });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
+    // need to format the location field based on the type
+    const formattedValues = {
+      ...values,
+      location:
+        values.location.type === "remote" ? "Remote" : values.location.address,
+    };
+
     setIsSubmitting(true);
     fetch("/api/report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
+      body: JSON.stringify(formattedValues),
     })
       .then((response) => {
         if (!response.ok) {
@@ -311,59 +339,93 @@ export default function ReportPage() {
               <div className="flex-1 space-y-8">
                 <FormField
                   control={form.control}
-                  name="location"
+                  name="location.type"
                   render={({ field }) => (
-                    <FormItem className="relative">
-                      <FormLabel>Location</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter city, state"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            fetchLocationSuggestions(e.target.value);
-                            setShowSuggestions(true);
-                          }}
-                          onBlur={() => {
-                            field.onBlur();
-                            // Delay hiding suggestions to allow for clicks
-                            setTimeout(() => setShowSuggestions(false), 200);
-                          }}
-                          onFocus={() => {
-                            if (field.value && locationSuggestions.length > 0) {
-                              setShowSuggestions(true);
-                            }
-                          }}
-                        />
-                      </FormControl>
-                      {isValidatingLocation && (
-                        <div className="absolute right-3 top-9">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        </div>
-                      )}
-                      {showSuggestions && locationSuggestions.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
-                          {locationSuggestions.map((suggestion, index) => (
-                            <div
-                              key={index}
-                              className="p-2 hover:bg-muted cursor-pointer"
-                              onClick={() => {
-                                form.setValue("location", suggestion);
-                                setShowSuggestions(false);
-                              }}
-                            >
-                              {suggestion}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <FormDescription>
-                        Enter a valid city and state (e.g., "San Francisco, CA")
-                      </FormDescription>
+                    <FormItem>
+                      <FormLabel>Work Location Type</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select location type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="remote">Remote</SelectItem>
+                          <SelectItem value="onsite">On-site</SelectItem>
+                          <SelectItem value="hybrid">Hybrid</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                {/* Only show address field for onsite or hybrid */}
+                {form.watch("location.type") !== "remote" && (
+                  <FormField
+                    control={form.control}
+                    name="location.address"
+                    render={({ field }) => (
+                      <FormItem className="relative">
+                        <FormLabel>Location Address</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter city, state/country"
+                            {...field}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              fetchLocationSuggestions(e.target.value);
+                              setShowSuggestions(true);
+                            }}
+                            onBlur={() => {
+                              field.onBlur();
+                              // Delay hiding suggestions to allow for clicks
+                              setTimeout(() => setShowSuggestions(false), 200);
+                            }}
+                            onFocus={() => {
+                              if (
+                                field.value &&
+                                locationSuggestions.length > 0
+                              ) {
+                                setShowSuggestions(true);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        {isValidatingLocation && (
+                          <div className="absolute right-3 top-9">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </div>
+                        )}
+                        {showSuggestions && locationSuggestions.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                            {locationSuggestions.map((suggestion, index) => (
+                              <div
+                                key={index}
+                                className="p-2 hover:bg-muted cursor-pointer"
+                                onClick={() => {
+                                  form.setValue("location.address", suggestion);
+                                  setShowSuggestions(false);
+                                }}
+                              >
+                                {suggestion}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <FormDescription>
+                          {form.watch("location.type") === "hybrid"
+                            ? "Required for hybrid positions (e.g., 'San Francisco, CA')"
+                            : "Enter a valid location (e.g., 'London, UK')"}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={form.control}
                   name="job_type"
@@ -372,7 +434,7 @@ export default function ReportPage() {
                       <FormLabel>Job Type</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -404,56 +466,6 @@ export default function ReportPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="benefits"
-                  render={({ field }) => (
-                    <FormItem style={{ marginTop: "22px" }}>
-                      <FormLabel>Benefits</FormLabel>
-                      <FormControl>
-                        <div className="space-y-2">
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="Add a benefit"
-                              value={benefitInput}
-                              onChange={(e) => setBenefitInput(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  addBenefit();
-                                }
-                              }}
-                            />
-                            <Button type="button" onClick={addBenefit}>
-                              Add
-                            </Button>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {field.value.map((benefit, index) => (
-                              <span
-                                key={index}
-                                className="bg-primary text-primary-foreground px-2 py-1 rounded-full text-sm flex items-center"
-                              >
-                                {benefit}
-                                <button
-                                  type="button"
-                                  onClick={() => removeBenefit(benefit)}
-                                  className="ml-2 focus:outline-none"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </FormControl>
-                      <FormDescription>
-                        Press Enter or click Add to add a benefit
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
             </div>
             <FormField
@@ -473,6 +485,58 @@ export default function ReportPage() {
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="benefits"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Benefits</FormLabel>
+                  <FormControl>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Add a benefit"
+                          value={benefitInput}
+                          onChange={(e) => setBenefitInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addBenefit();
+                            }
+                          }}
+                        />
+                        <Button type="button" onClick={addBenefit}>
+                          Add
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {field.value.map((benefit, index) => (
+                          <span
+                            key={index}
+                            className="bg-primary text-primary-foreground px-2 py-1 rounded-full text-sm flex items-center"
+                          >
+                            {benefit}
+                            <button
+                              type="button"
+                              onClick={() => removeBenefit(benefit)}
+                              className="ml-2 focus:outline-none"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </FormControl>
+                  <FormDescription>
+                    Press Enter or click Add to add a benefit
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="skills"

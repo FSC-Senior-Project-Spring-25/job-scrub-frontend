@@ -21,8 +21,7 @@ import {
   Edit,
   Briefcase,
   MapPin,
-  Calendar,
-  DollarSign,
+  Calendar as CalendarIcon,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -46,6 +45,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { JobReport } from "@/types/types";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { Calendar as DateCalendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 const formSchema = z.object({
   title: z.string().min(1, {
@@ -57,24 +64,42 @@ const formSchema = z.object({
   url: z.string().url({
     message: "Please enter a valid URL.",
   }),
-  date: z.string().min(1, {
-    message: "Date posted is required.",
+  date: z.date({
+    required_error: "Date posted is required.",
   }),
   description: z.string().min(1, {
     message: "Job description is required.",
   }),
   salary: z.string().optional(),
-  benefits: z.array(z.string()).default([]).optional(),
+  benefits: z.array(z.string()),
   skills: z.array(z.string()).min(1, {
     message: "At least one skill is required.",
   }),
   location: z
-    .string()
-    .min(1, {
-      message: "Location is required.",
+    .object({
+      type: z.enum(["remote", "onsite", "hybrid"]),
+      address: z
+        .string()
+        .optional()
+        .refine(
+          (val) => {
+            // Only validate if it's provided and not remote
+            if (!val) return true;
+            return /^[A-Za-z\s\-\.]+(?:[,]\s*[A-Za-z\s\-\.]+)*$/.test(val);
+          },
+          {
+            message:
+              "Please enter a valid location (e.g., 'City, Country' or 'City, State')",
+          }
+        ),
     })
-    .refine((val) => /^[A-Za-z\s]+(,\s*[A-Za-z\s]+)+$/.test(val), {
-      message: "Location must be in 'City, State' format.",
+    .refine((data) => !(data.type === "hybrid" && !data.address), {
+      message: "Address is required for hybrid positions",
+      path: ["address"],
+    })
+    .refine((data) => !(data.type === "onsite" && !data.address), {
+      message: "Address is required for onsite positions",
+      path: ["address"],
     }),
   job_type: z.enum([
     "fulltime",
@@ -99,7 +124,9 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 }
 
 export default function VerifyPage() {
-  const [unverifiedJobs, setUnverifiedJobs] = useState<Record<string, JobReport>>({});
+  const [unverifiedJobs, setUnverifiedJobs] = useState<
+    Record<string, JobReport>
+  >({});
   const { user } = useAuth();
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -117,12 +144,15 @@ export default function VerifyPage() {
       title: "",
       company: "",
       url: "",
-      date: "",
+      date: new Date(),
       description: "",
       salary: "",
       skills: [""],
       benefits: [""],
-      location: "",
+      location: {
+        type: "onsite",
+        address: "",
+      },
       job_type: undefined,
     },
   });
@@ -156,7 +186,7 @@ export default function VerifyPage() {
       | "freelance"
       | "internship"
       | undefined;
-
+  
     if (job.job_type) {
       const normalizedType = job.job_type.toLowerCase().replace(/[^a-z]/g, "");
       if (
@@ -171,18 +201,57 @@ export default function VerifyPage() {
         jobType = normalizedType as any;
       }
     }
-
+  
+    // Format the date properly for the date input
+    let formattedDate = new Date();
+    if (job.date) {
+      try {
+        formattedDate = new Date(job.date);
+        if (isNaN(formattedDate.getTime())) {
+          console.error("Invalid date format:", job.date);
+          formattedDate = new Date(); // Default to today
+        }
+      } catch (error) {
+        console.error("Error parsing date:", error, job.date);
+        formattedDate = new Date(); // Default to today
+      }
+    }
+  
+    // Parse location into type and address
+    let locationType: "remote" | "onsite" | "hybrid" = "onsite";
+    let locationAddress = "";
+    
+    if (job.location) {
+      // Check if location is already an object with type and address properties
+      if (typeof job.location === 'object' && job.location !== null && 'type' in job.location) {
+        const location = job.location as { type: "remote" | "onsite" | "hybrid"; address?: string };
+        locationType = location.type;
+        locationAddress = location.address || "";
+      } else if (typeof job.location === 'string') {
+        // If location is a string, determine if it's "Remote" or an address
+        if (job.location.toLowerCase() === "remote") {
+          locationType = "remote";
+        } else {
+          locationType = "onsite"; // Default to onsite for other locations
+          locationAddress = job.location;
+        }
+      }
+    }
+  
     form.reset({
       title: job.title || "",
       company: job.company || "",
       url: job.url || "",
-      date: job.date || "",
+      date: formattedDate,
       description: job.description || "",
       salary: job.salary || "",
-      skills: job.skills.length ? job.skills : [""],
+      skills: job.skills?.length ? job.skills : [""],
       benefits: job.benefits?.length ? job.benefits : [""],
-      location: job.location || "",
-      job_type: jobType,
+      location: {
+        type: locationType,
+        address: locationAddress,
+      },
+      job_type: jobType || "fulltime", 
     });
   };
 
@@ -207,6 +276,12 @@ export default function VerifyPage() {
 
       const formData = form.getValues();
 
+      // Format location based on type before sending to API
+      const formattedLocation =
+        formData.location.type === "remote"
+          ? "Remote"
+          : formData.location.address;
+
       // Prepare job data for API
       const jobData = {
         ...unverifiedJobs[jobId],
@@ -220,12 +295,12 @@ export default function VerifyPage() {
         benefits: (formData.benefits || []).filter(
           (benefit) => benefit.trim() !== ""
         ),
-        location: formData.location,
+        location: formattedLocation, // Use formatted location string
         job_type: formData.job_type || "",
       };
 
       const response = await fetch(
-        `/api/job/verify/?jobId=${jobId}&verified=${verified}`,
+        `/api/job/verify?jobId=${jobId}&verified=${verified}`,
         {
           method: "PATCH",
           body: JSON.stringify({
@@ -287,15 +362,21 @@ export default function VerifyPage() {
 
   const saveChanges = async () => {
     if (!activeJobId) return;
-
+  
     const valid = await form.trigger();
     if (!valid) {
       toast.error("Please fix the errors before saving changes.");
       return;
     }
-
+  
     const formData = form.getValues();
-
+  
+    // Format location based on type before saving
+    const formattedLocation = 
+      formData.location.type === "remote" 
+        ? "Remote" 
+        : formData.location.address;
+  
     // Update the job in state
     const updatedJob = {
       ...unverifiedJobs[activeJobId],
@@ -306,17 +387,18 @@ export default function VerifyPage() {
       description: formData.description,
       salary: formData.salary || "",
       skills: formData.skills.filter((skill) => skill.trim() !== ""),
-      location: formData.location,
+      location: formattedLocation,
       job_type: formData.job_type || "",
+      benefits: (formData.benefits || []).filter(benefit => benefit.trim() !== ""),
     };
-
+  
     setUnverifiedJobs({
       ...unverifiedJobs,
-      [activeJobId]: updatedJob,
+      [activeJobId]: updatedJob as JobReport,
     });
-
+  
     setIsEditing(false);
-
+  
     toast.success("Changes saved successfully");
   };
 
@@ -559,112 +641,154 @@ export default function VerifyPage() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Location Type Field */}
                       <FormField
                         control={form.control}
-                        name="location"
+                        name="location.type"
                         render={({ field }) => (
-                          <FormItem className="relative">
-                            <FormLabel>Location</FormLabel>
-                            <FormControl>
-                              <div className="flex items-center">
-                                <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                                <Input
-                                  {...field}
-                                  placeholder="Enter city, state"
-                                  onChange={(e) => {
-                                    field.onChange(e);
-                                    fetchLocationSuggestions(e.target.value);
-                                    setShowSuggestions(true);
-                                  }}
-                                  disabled={!isEditing || isSubmitting}
-                                  onBlur={() => {
-                                    field.onBlur();
-                                    // Delay hiding suggestions to allow for clicks
-                                    setTimeout(
-                                      () => setShowSuggestions(false),
-                                      200
-                                    );
-                                  }}
-                                  onFocus={() => {
-                                    if (
-                                      field.value &&
-                                      locationSuggestions.length > 0
-                                    ) {
-                                      setShowSuggestions(true);
-                                    }
-                                  }}
-                                />
-                              </div>
-                            </FormControl>
-                            {isValidatingLocation && (
-                              <div className="absolute right-3 top-9">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              </div>
-                            )}
-                            {showSuggestions &&
-                              locationSuggestions.length > 0 && (
-                                <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
-                                  {locationSuggestions.map(
-                                    (suggestion, index) => (
-                                      <div
-                                        key={index}
-                                        className="p-2 hover:bg-muted cursor-pointer"
-                                        onMouseDown={(e) => {
-                                          e.preventDefault(); // Prevent onBlur from firing before click
-                                          field.onChange(suggestion);
-                                          setShowSuggestions(false);
-                                        }}
-                                      >
-                                        {suggestion}
-                                      </div>
-                                    )
-                                  )}
-                                </div>
-                              )}
-                            <FormDescription>
-                              Enter a valid city and state (e.g., "San
-                              Francisco, CA")
-                            </FormDescription>
+                          <FormItem>
+                            <FormLabel>Location Type</FormLabel>
+                            <Select
+                              disabled={!isEditing || isSubmitting}
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select location type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="remote">Remote</SelectItem>
+                                <SelectItem value="onsite">On-site</SelectItem>
+                                <SelectItem value="hybrid">Hybrid</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+
+                      {/* Only show address field if not remote */}
+                      {form.watch("location.type") !== "remote" && (
+                        <FormField
+                          control={form.control}
+                          name="location.address"
+                          render={({ field }) => (
+                            <FormItem className="relative">
+                              <FormLabel>Location Address</FormLabel>
+                              <FormControl>
+                                <div className="flex items-center">
+                                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                                  <Input
+                                    {...field}
+                                    placeholder="Enter city, state"
+                                    onChange={(e) => {
+                                      field.onChange(e);
+                                      fetchLocationSuggestions(e.target.value);
+                                      setShowSuggestions(true);
+                                    }}
+                                    disabled={!isEditing || isSubmitting}
+                                    onBlur={() => {
+                                      field.onBlur();
+                                      setTimeout(
+                                        () => setShowSuggestions(false),
+                                        200
+                                      );
+                                    }}
+                                    onFocus={() => {
+                                      if (
+                                        field.value &&
+                                        locationSuggestions.length > 0
+                                      ) {
+                                        setShowSuggestions(true);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </FormControl>
+                              {isValidatingLocation && (
+                                <div className="absolute right-3 top-9">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                </div>
+                              )}
+                              {showSuggestions &&
+                                locationSuggestions.length > 0 && (
+                                  <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                                    {locationSuggestions.map(
+                                      (suggestion, index) => (
+                                        <div
+                                          key={index}
+                                          className="p-2 hover:bg-muted cursor-pointer"
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            field.onChange(suggestion);
+                                            setShowSuggestions(false);
+                                          }}
+                                        >
+                                          {suggestion}
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                )}
+                              <FormDescription>
+                                Enter a valid city and state (e.g., "San
+                                Francisco, CA")
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+
+                      {/* Date Field */}
                       <FormField
                         control={form.control}
                         name="date"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="">
                             <FormLabel>Date Posted</FormLabel>
-                            <FormControl>
-                              <div className="flex items-center">
-                                <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                                <Input
-                                  {...field}
-                                  type="date"
-                                  disabled={!isEditing || isSubmitting}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                      "w-full pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                    disabled={!isEditing || isSubmitting}
+                                  >
+                                    {field.value ? (
+                                      format(new Date(field.value), "PPP")
+                                    ) : (
+                                      <span>Pick a date</span>
+                                    )}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-auto p-0"
+                                align="start"
+                              >
+                                <DateCalendar // Change from Calendar to DateCalendar
+                                  mode="single"
+                                  selected={
+                                    field.value instanceof Date
+                                      ? field.value
+                                      : new Date(field.value || Date.now())
+                                  }
+                                  onSelect={field.onChange}
+                                  disabled={(date) =>
+                                    date > new Date() ||
+                                    date < new Date("1900-01-01")
+                                  }
+                                  initialFocus
                                 />
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="salary"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Salary</FormLabel>
-                            <FormControl>
-                              <div className="flex items-center">
-                                <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
-                                <Input
-                                  {...field}
-                                  disabled={!isEditing || isSubmitting}
-                                  placeholder="Enter salary (optional)"
-                                />
-                              </div>
-                            </FormControl>
+                              </PopoverContent>
+                            </Popover>
                             <FormMessage />
                           </FormItem>
                         )}

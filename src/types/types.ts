@@ -16,7 +16,7 @@ export interface JobReport {
   title: string;
   company: string;
   url: string;
-  date: string;
+  date: string | Date;
   description: string;
   salary?: string;
   benefits: string[];
