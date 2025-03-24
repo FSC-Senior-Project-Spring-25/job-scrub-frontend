@@ -9,7 +9,7 @@ export default function AnimatedLogo() {
     const interval = setInterval(() => {
     setProgress((prev) => {
       if (prev >= 100) return 0
-      return prev + 2
+      return prev + 1
     })
     }, 20)
 
