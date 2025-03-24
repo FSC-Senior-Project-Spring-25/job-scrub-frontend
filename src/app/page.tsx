@@ -11,8 +11,9 @@ import {
   FaDollarSign,
 } from "react-icons/fa";
 import { toast } from "sonner";
-import { useAuth } from "./AuthContext";
+import { useAuth } from "./auth-context";
 import { Job } from "@/types/types";
+import AnimatedLogo from "@/components/animated-logo";
 
 export default function HomePage() {
   const [search, setSearch] = useState("");
@@ -66,6 +67,8 @@ export default function HomePage() {
 
   // Filter jobs based on search
   const filteredJobs = Object.entries(jobs).filter(([id, job]) => {
+    if (!job || typeof job !== 'object') return false;
+
     const searchLower = search.toLowerCase();
     return (
       job.title.toLowerCase().includes(searchLower) ||
@@ -74,12 +77,11 @@ export default function HomePage() {
       job.skills.some((skill) => skill.toLowerCase().includes(searchLower))
     );
   });
-
   // If still loading auth state, show a simple loading indicator
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-xl font-semibold text-gray-600">Loading...</div>
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <AnimatedLogo />
       </div>
     );
   }

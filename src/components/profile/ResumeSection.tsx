@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/app/firebase";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import { User } from "firebase/auth";
 import FileUpload from "../file-upload";
-import { useAuth } from "@/app/AuthContext";
+import { useAuth } from "@/app/auth-context";
 
 interface ResumeData {
   success: boolean;

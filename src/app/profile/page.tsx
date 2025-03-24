@@ -9,7 +9,8 @@ import ExperienceSection from "@/components/profile/ExperienceSection";
 import ResumeSection from "@/components/profile/ResumeSection";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import { toast } from "sonner";
-import ProtectedRoute from "@/components/protected-route";
+import { useAuth } from "../auth-context";
+import AnimatedLogo from "@/components/animated-logo";
 
 interface FormData {
   username: string;
@@ -24,7 +25,8 @@ interface FormData {
 
 export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
-
+  const { user, loading: authLoading } = useAuth();
+  const [loading, setLoading] = useState(false);
   //Form Data State
   const [formData, setFormData] = useState<FormData>({
     username: "",
@@ -40,6 +42,7 @@ export default function ProfilePage() {
   //Fetch user data from Firestore
   useEffect(() => {
     const fetchUserData = async (uid: string) => {
+      setLoading(true);
       try {
         const userRef = doc(db, "users", uid);
         const userSnap = await getDoc(userRef);
@@ -60,6 +63,7 @@ export default function ProfilePage() {
       } catch (error) {
         console.error("Error fetching user data:", error);
       } finally {
+        setLoading(false);
       }
     };
 
@@ -139,33 +143,39 @@ export default function ProfilePage() {
     }
   };
 
-  return (
-    <ProtectedRoute>
-      <div className="p-6 w-full bg-gray-100 shadow-md rounded-lg min-h-screen flex flex-col">
-        {/* Profile Header */}
-        <ProfileHeader
-          formData={formData}
-          editing={editing}
-          setEditing={setEditing}
-          setFormData={setFormData}
-          handleSave={handleSave}
-        />
-
-        {/* Profile Sections */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 w-full max-w-screen-2xl mx-auto">
-          <EducationSection
-            formData={formData}
-            setFormData={setFormData}
-            onDeleteEducation={handleDeleteEducation}
-          />
-          <ExperienceSection
-            formData={formData}
-            setFormData={setFormData}
-            onDeleteExperience={handleDeleteExperience}
-          />
-          <ResumeSection />
-        </div>
+  if (loading || authLoading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <AnimatedLogo />
       </div>
-    </ProtectedRoute>
+    );
+  }
+
+  return (
+    <div className="p-6 w-full bg-gray-100 shadow-md rounded-lg min-h-screen flex flex-col">
+      {/* Profile Header */}
+      <ProfileHeader
+        formData={formData}
+        editing={editing}
+        setEditing={setEditing}
+        setFormData={setFormData}
+        handleSave={handleSave}
+      />
+
+      {/* Profile Sections */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 w-full max-w-screen-2xl mx-auto">
+        <EducationSection
+          formData={formData}
+          setFormData={setFormData}
+          onDeleteEducation={handleDeleteEducation}
+        />
+        <ExperienceSection
+          formData={formData}
+          setFormData={setFormData}
+          onDeleteExperience={handleDeleteExperience}
+        />
+        <ResumeSection />
+      </div>
+    </div>
   );
 }
