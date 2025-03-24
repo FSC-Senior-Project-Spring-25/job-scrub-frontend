@@ -1,43 +1,56 @@
 "use client";
-import { useState,useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { auth } from '../firebase'; 
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../auth-context';
+import { Loader2 } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-  const {user} = useAuth();
+  const { user, loading, login } = useAuth();
 
+  // Redirect to the main page if already logged in
+  useEffect(() => {
+    if (user) {
+      router.push("/");
+    }
+  }, [user, router]);
 
-  //redirecting to the main page if the user is already loggedIn
-  useEffect(()=>{
-  if(user){
-    router.push("/");
-  }
-  })
-
-  if(user) return null;// prevents flickering somehow
+  // Prevent form display if loading or already logged in
+  if (loading || user) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="h-8 w-8 animate-spin" />
+    </div>
+  );
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
 
     if (!email || !password) {
       setError('Please fill in all fields.');
+      setIsSubmitting(false);
       return;
     }
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // redirect to the main page here on successfull login 
-      router.push('/'); 
+      const result = await login(email, password);
+      
+      if (result.success) {
+        router.push('/');
+      } else {
+        setError(result.error || 'Invalid email or password. Please try again.');
+      }
     } catch (err) {
-      setError('Invalid email or password. Please try again.');
+      setError('An unexpected error occurred. Please try again.');
       console.error(err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -58,6 +71,7 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isSubmitting}
               className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
@@ -72,14 +86,23 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={isSubmitting}
               className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
           <button
             type="submit"
-            className="w-full px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            disabled={isSubmitting}
+            className="w-full px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-green-300"
           >
-            Log In
+            {isSubmitting ? (
+              <div className="flex items-center justify-center">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Logging in...
+              </div>
+            ) : (
+              "Log In"
+            )}
           </button>
         </form>
         <p className="text-center text-gray-600">
