@@ -10,7 +10,7 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
   const router = useRouter();
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -26,6 +26,11 @@ export default function Signup() {
       return;
     }
 
+    if (password.length < 6 || !/\d/.test(password)) {
+      setError('Password must be at least 6 characters long and include at least one number.');
+      return;
+    }
+
     try {
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -34,13 +39,21 @@ export default function Signup() {
       await setDoc(doc(db, 'users', user.uid), {
         email,
         createdAt: new Date(),
+        isAdmin: false
       });
 
       // redirecting to login page after successful signup
       router.push('/login'); 
-    } catch (err) {
+
+      console.log('just after the login line');
+    } catch (err:any) {
+      console.log(err);
+      if(err.code == 'auth/email-already-in-use'){
+       setError('A user with this email already exists');
+      }
+      else{
       setError('Error signing up. Please try again.');
-      console.error(err);
+      }
     }
   };
 
@@ -61,7 +74,7 @@ export default function Signup() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
           <div>
@@ -75,7 +88,7 @@ export default function Signup() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
 
           </div>
@@ -90,12 +103,12 @@ export default function Signup() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
           <button
             type="submit"
-            className="w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
           >
             Sign Up
           </button>
