@@ -149,7 +149,7 @@ export default function ReportPage() {
     };
 
     setIsSubmitting(true);
-    fetch("/api/report", {
+    fetch("/api/job/report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formattedValues),
@@ -229,14 +229,43 @@ export default function ReportPage() {
 
         if (response.ok) {
           const data = await response.json();
-          const suggestions = data.map((item: any) => ({
-            address: item.display_name.split(",").slice(0, 2).join(",").trim(),
-            coordinates: {
-              lat: parseFloat(item.lat),
-              lon: parseFloat(item.lon),
-            },
-          }));
-
+          const suggestions: LocationSuggestion[] = data
+            .map((item: any) => {
+              // Get the most specific location name with fallbacks
+              const locationName = 
+                item.address?.city || 
+                item.address?.town || 
+                item.address?.village;
+        
+              // Skip if no location name found
+              if (!locationName) return null;
+        
+              // For US addresses, use state
+              if (item.address?.country === "United States" && item.address?.state) {
+                return {
+                  address: `${locationName}, ${item.address.state}`,
+                  coordinates: {
+                    lat: parseFloat(item.lat),
+                    lon: parseFloat(item.lon),
+                  }
+                };
+              }
+              
+              // For international addresses, use country
+              if (item.address?.country) {
+                return {
+                  address: `${locationName}, ${item.address.country}`,
+                  coordinates: {
+                    lat: parseFloat(item.lat),
+                    lon: parseFloat(item.lon),
+                  }
+                };
+              }
+        
+              return null;
+            })
+            .filter((item: any): item is LocationSuggestion => item !== null);
+        
           setLocationSuggestions(suggestions);
         }
       } catch (error) {
