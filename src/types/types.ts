@@ -12,19 +12,25 @@ export interface MatchResponse {
   job_keywords: string[];
 }
 
+export interface Location {
+  address: string;
+  lat: number;
+  lon: number;
+}
+
 export interface JobReport {
   title: string;
   company: string;
   url: string;
-  date: string | Date;
   description: string;
-  salary?: string;
-  benefits: string[];
-  skills: string[];
-  location: string;
   job_type: string;
+  skills: string[];
+  location: Location | null;
+  locationType: 'remote' | 'onsite' | 'hybrid';
+  benefits?: string[];
+  date?: string;
+  salary?: string;
 }
-
 export interface Job {
   company: string;
   date: string;
