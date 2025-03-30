@@ -280,7 +280,7 @@ export default function HomePage() {
                             Save
                           </button>
                           <Link
-                            href={`/job/${jobId}`}
+                            href={`/jobs/${jobId}`}
                             className="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
                           >
                             View Details
