@@ -79,11 +79,11 @@ const formSchema = z.object({
     message: "At least one skill is required.",
   }),
   location: locationSchema,
-  job_type: z.enum([
+  jobType: z.enum([
     "fulltime",
     "parttime",
     "contract",
-    "freelance",
+    "volunteer",
     "internship",
   ]),
 });
@@ -132,7 +132,7 @@ export default function ReportPage() {
         type: "onsite",
         address: "",
       },
-      job_type: "fulltime",
+      jobType: "fulltime",
     },
   });
 
@@ -145,7 +145,9 @@ export default function ReportPage() {
         address: values.location.address,
         coordinates: values.location.coordinates,
       },
+      locationType: values.location.type,
       date: format(values.date, "yyyy-MM-dd"),
+      jobType: values.jobType
     };
 
     setIsSubmitting(true);
@@ -460,7 +462,7 @@ export default function ReportPage() {
               )}
               <FormField
                 control={form.control}
-                name="job_type"
+                name="jobType"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Job Type</FormLabel>

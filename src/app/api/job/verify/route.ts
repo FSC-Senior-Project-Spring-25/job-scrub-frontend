@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function PATCH(req: NextRequest) {
   try {
-    // Get the job ID from the URL params
     const jobId = req.nextUrl.searchParams.get("jobId");
     if (!jobId) {
       return NextResponse.json({ error: "Job ID is required" }, { status: 400 });
@@ -11,19 +10,22 @@ export async function PATCH(req: NextRequest) {
     const verified = req.nextUrl.searchParams.get("verified") === "true";
     const body = await req.json();
 
-    // Prepare the job data for the FastAPI service
-    // Converting any stringified JSON back to arrays
     const jobData = {
       title: body.title,
       company: body.company,
       url: body.url,
       description: body.description,
-      job_type: body.job_type,
-      location: body.location,
-      skills: typeof body.skills === "string" ? JSON.parse(body.skills) : body.skills,
-      benefits: typeof body.benefits === "string" ? JSON.parse(body.benefits) : body.benefits,
+      jobType: body.jobType,
+      skills: Array.isArray(body.skills) ? body.skills : [],
+      location: {
+        address: body.location.address,
+        lat: body.location.coordinates.lat,
+        lon: body.location.coordinates.lon,
+      },
+      locationType: body.locationType.toLowerCase(),
+      benefits: Array.isArray(body.benefits) ? body.benefits : [],
       date: body.date,
-      salary: body.salary,
+      salary: body.salary || null,
     };
     
     const response = await fetch(`${process.env.API_URL}/job/verify/${jobId}?verified=${verified}`, {
@@ -35,7 +37,6 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!response.ok) {
-      // Forward any errors from the API
       const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
       return NextResponse.json(
         { error: errorData.message || "Failed to verify job" },
@@ -44,10 +45,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const responseData = await response.json();
-    return NextResponse.json(
-      responseData,
-      { status: response.status }
-    );
+    return NextResponse.json(responseData, { status: response.status });
 
   } catch (error) {
     console.error("Error verifying job:", error);
