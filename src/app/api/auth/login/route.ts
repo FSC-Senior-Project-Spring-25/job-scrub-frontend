@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ id_token: idToken }),
+      body: JSON.stringify({ idToken: idToken }),
       credentials: 'include', // Important for cookie handling
     });
     
@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     const responseData = await cookieResponse.json();
     
     // Get Set-Cookie header from FastAPI response
+    // Get Set-Cookie header from FastAPI response
     const setCookieHeader = cookieResponse.headers.get('set-cookie');
     if (!setCookieHeader) {
       console.error('No Set-Cookie header in FastAPI response');
@@ -38,8 +39,17 @@ export async function POST(request: NextRequest) {
     // Create the response with the success data
     const response = NextResponse.json(responseData);
     
-    // Forward the Set-Cookie header from FastAPI
-    response.headers.set('Set-Cookie', setCookieHeader);
+    // Parse cookie parts and set properly
+    const sessionCookie = setCookieHeader.split(';')[0].split('=')[1];
+    response.cookies.set({
+      name: 'session',
+      value: sessionCookie,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // Secure in production
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 5 * 24 * 60 * 60 // 5 days in seconds
+    });
     
     return response;
   } catch (error) {
