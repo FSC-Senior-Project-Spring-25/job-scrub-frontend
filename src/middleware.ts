@@ -15,9 +15,9 @@ export async function middleware(request: NextRequest) {
   // Allow public paths and static files
   if (isPublicPath || request.nextUrl.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
     // If user is logged in and tries to access login/signup, redirect to home
-    if (sessionCookie && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
+    // if (sessionCookie && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
+    //   return NextResponse.redirect(new URL('/', request.url));
+    // }
     return NextResponse.next();
   }
 
