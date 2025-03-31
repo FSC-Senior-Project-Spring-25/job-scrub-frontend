@@ -23,14 +23,15 @@ export interface JobReport {
   company: string;
   url: string;
   description: string;
-  job_type: string;
+  jobType: 'fulltime' | 'parttime' | 'contract' | 'volunteer' | 'internship';
   skills: string[];
-  location: Location | null;
   locationType: 'remote' | 'onsite' | 'hybrid';
+  location?: Location | null;
   benefits?: string[];
   date?: string;
-  salary?: string;
+  salary?: string | null;
 }
+
 export interface Job {
   company: string;
   date: string;
