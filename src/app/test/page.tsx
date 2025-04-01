@@ -173,7 +173,8 @@ export default function ResumeEnhancer() {
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-green-200 to-green-100">
-      <div className="flex-1 overflow-hidden max-w-2xl w-full mx-auto flex flex-col p-4 gap-4">
+      {/* Changed max-w-2xl to max-w-3xl for 15% wider container */}
+      <div className="flex-1 overflow-hidden max-w-3xl w-full mx-auto flex flex-col p-4 gap-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-green-200 w-full text-center">
@@ -211,7 +212,7 @@ export default function ResumeEnhancer() {
                     <Bot className="h-4 w-4 text-green-600" />
                   )}
                   <span className={`text-xs font-medium ${message.role === "user" ? "text-green-100" : "text-green-700"}`}>
-                    {message.role === "user" ? "You" : "Resume Assistant"}
+                    {message.role === "user" ? "You" : "Assistant"}
                   </span>
                   <span className={`text-xs ${message.role === "user" ? "text-green-200" : "text-gray-500"}`}>
                     {message.timestamp && new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
