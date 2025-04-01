@@ -21,6 +21,7 @@ interface FormData {
   profileIcon: string;
   education: string[];
   experience: string[];
+  isPrivate?: boolean; // privacy setting
 }
 
 export default function ProfilePage() {
@@ -58,6 +59,7 @@ export default function ProfilePage() {
             profileIcon: userData.profileIcon || "",
             education: userData.education || [],
             experience: userData.experience || [],
+            isPrivate: userData.isPrivate ?? false, //maps Firestore field into local state
           });
         }
       } catch (error) {
@@ -91,6 +93,7 @@ export default function ProfilePage() {
       await updateDoc(userRef, {
         ...formData,
         email: auth.currentUser.email,
+        isPrivate: formData.isPrivate ?? false, // including this if you have a privacy setting
       });
 
       toast.success("Profile updated successfully!");
@@ -155,11 +158,11 @@ export default function ProfilePage() {
     <div className="p-6 w-full bg-gray-100 shadow-md rounded-lg min-h-screen flex flex-col">
       {/* Profile Header */}
       <ProfileHeader
-        formData={formData}
-        editing={editing}
-        setEditing={setEditing}
-        setFormData={setFormData}
-        handleSave={handleSave}
+           formData={{ ...formData, isPrivate: formData.isPrivate ?? false }}
+           editing={editing}
+           setEditing={setEditing}
+           setFormData={setFormData}
+           handleSave={handleSave}
       />
 
       {/* Profile Sections */}

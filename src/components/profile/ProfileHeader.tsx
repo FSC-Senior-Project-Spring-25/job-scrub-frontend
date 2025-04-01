@@ -10,6 +10,7 @@ interface ProfileHeaderProps {
     phone: string;
     acctype: boolean;
     profileIcon: string;
+    isPrivate?: boolean; 
   };
   editing: boolean;
   setEditing: React.Dispatch<React.SetStateAction<boolean>>;
@@ -23,6 +24,7 @@ interface ProfileHeaderProps {
       profileIcon: string;
       education: string[];
       experience: string[];
+      isPrivate?: boolean;
     }>
   >;
   handleSave: () => void;
@@ -128,6 +130,7 @@ export default function ProfileHeader({
         ) : (
           <p className="text-gray-600 text-lg">{formData.phone || "No phone number added"}</p>
         )}
+        
 
         {/* Editable Bio */}
         {editing ? (
@@ -142,6 +145,32 @@ export default function ProfileHeader({
         ) : (
           <p className="text-gray-500 italic text-lg">{formData.bio || "No bio yet. Edit your profile to add one!"}</p>
         )}
+
+        {/* toggle for account type */}
+        {editing && (
+       <div className="flex items-center gap-2 mt-4 text-sm">
+         <label className="flex items-center gap-2 cursor-pointer">
+         <input
+          type="checkbox"
+          checked={formData.isPrivate ?? false}
+          onChange={(e) =>
+          setFormData((prev) => ({
+            ...prev,
+            isPrivate: e.target.checked,
+           }))
+            }
+           className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+            />
+           Make profile private
+          </label>
+           <div className="relative group">
+           <span className="text-gray-400 cursor-pointer">❔</span>
+          <div className="absolute z-10 hidden group-hover:block text-xs bg-black text-white rounded p-2 bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-48 text-center">
+            Your profile will not be searchable in messages
+          </div>
+         </div>
+          </div>
+          )}
 
         {/* Save & Edit Buttons */}
         <div className="mt-4 flex gap-2">
