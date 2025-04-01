@@ -2,7 +2,6 @@
 
 import { useState, useRef, FormEvent, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Send, FileUp, XCircle } from "lucide-react";
@@ -12,6 +11,16 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp?: number;
+  files?: Array<{
+    name: string;
+  }>;
+}
+
+interface ChatResponse {
+  response: string;
+  conversation: any[];
+  conversation_id: string;
+  selected_agent: string;
 }
 
 export default function ChatbotTestPage() {
@@ -23,6 +32,8 @@ export default function ChatbotTestPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const [conversationHistory, setConversationHistory] = useState<any[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
@@ -34,13 +45,14 @@ export default function ChatbotTestPage() {
     if (!input.trim() && files.length === 0) return;
 
     // Add user message to chat
-    setMessages((prev) => [...prev, { role: "user", content: input, timestamp: Date.now() }]);
+    const userMessage: Message = {
+      role: "user",
+      content: input,
+      timestamp: Date.now(),
+      files: files.map(file => ({ name: file.name }))
+    };
     
-    // Create temporary placeholder for assistant response
-    setMessages((prev) => [
-      ...prev,
-      { role: "assistant", content: "" },
-    ]);
+    setMessages(prev => [...prev, userMessage]);
     
     setIsLoading(true);
     const userInput = input;
@@ -57,13 +69,14 @@ export default function ChatbotTestPage() {
       });
       
       const token = await user?.getIdToken();
-      // Start the streaming request
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/stream`, {
+      
+      // Use the non-streaming chat endpoint
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/message`, {
         method: "POST",
         body: formData,
-        headers: {
-            "Authorization": `Bearer ${token}`,
-        },
+        headers: token ? {
+          "Authorization": `Bearer ${token}`
+        } : {},
         credentials: "include",
       });
 
@@ -71,86 +84,44 @@ export default function ChatbotTestPage() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Process the stream
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("Response body cannot be read");
-
-      // Create a TextDecoder to decode the received chunks
-      const decoder = new TextDecoder();
-      let assistantResponse = "";
-
-      // Update the last message (assistant's response) as chunks arrive
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        // Decode the chunk
-        const chunk = decoder.decode(value);
-        
-        // Process SSE format (data: [content]\n\n)
-        const lines = chunk.split("\n\n");
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const content = line.substring(6);
-            
-            // Check if we're done or if there's an error
-            if (content === "[DONE]") {
-              break;
-            } else if (content.startsWith("Error:")) {
-              throw new Error(content);
-            } else {
-              try {
-                // Check if this is a history update message
-                if (content.startsWith('{"type":"history","conversation":')) {
-                  const historyData = JSON.parse(content);
-                  setConversationHistory(historyData.conversation);
-                  continue;
-                }
-              } catch (e) {
-                // Not JSON, treat as regular text chunk
-              }
-              
-              // Append the chunk to the assistant's response
-              assistantResponse += content;
-              
-              // Update the last message (assistant's response)
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  role: "assistant",
-                  content: assistantResponse,
-                  timestamp: Date.now()
-                };
-                return updated;
-              });
-            }
-            if (content === "[DONE]") break;
-            if (content.startsWith("Error:")) throw new Error(content);
-            
-            assistantResponse += content;
-            setMessages(prev => {
-              const updated = [...prev];
-              updated[updated.length - 1] = { role: "assistant", content: assistantResponse };
-              return updated;
-            });
-          }
-        }
+      const data: ChatResponse = await response.json();
+      
+      // Update conversation history from response
+      setConversationHistory(data.conversation);
+      
+      // Set conversation ID if available
+      if (data.conversation_id) {
+        setConversationId(data.conversation_id);
       }
+      
+      // Update selected agent if available
+      if (data.selected_agent) {
+        setSelectedAgent(data.selected_agent);
+      }
+      
+      // Add assistant response to messages
+      setMessages(prev => [
+        ...prev, 
+        {
+          role: "assistant",
+          content: data.response,
+          timestamp: Date.now()
+        }
+      ]);
 
       // Clear files after successful submission
       setFiles([]);
     } catch (error) {
       console.error("Error:", error);
-      // Update the last message to show the error
-      setMessages((prev) => {
-        const updated = [...prev];
-        updated[updated.length - 1] = {
+      // Add error message
+      setMessages(prev => [
+        ...prev,
+        {
           role: "assistant",
           content: `Error: ${error instanceof Error ? error.message : "Something went wrong"}`,
           timestamp: Date.now()
-        };
-        return updated;
-      });
+        }
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -159,12 +130,12 @@ export default function ChatbotTestPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
-      setFiles((prev) => [...prev, ...newFiles]);
+      setFiles(prev => [...prev, ...newFiles]);
     }
   };
 
   const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const triggerFileInput = () => {
@@ -174,6 +145,17 @@ export default function ChatbotTestPage() {
   return (
     <div className="flex flex-col h-screen max-w-3xl mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Chatbot Test Interface</h1>
+      
+      {selectedAgent && (
+        <div className="mb-4 p-2 bg-blue-50 rounded-md text-sm">
+          Active Agent: <span className="font-semibold">{selectedAgent}</span>
+          {conversationId && (
+            <span className="ml-2 text-gray-500">
+              (Conversation ID: {conversationId})
+            </span>
+          )}
+        </div>
+      )}
       
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto mb-4 space-y-4">
@@ -189,6 +171,18 @@ export default function ChatbotTestPage() {
                   {message.role === "user" ? "You" : "Assistant"}
                 </p>
                 <div className="whitespace-pre-wrap">{message.content}</div>
+                
+                {message.files && message.files.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {message.files.map((file, fileIndex) => (
+                      <div key={fileIndex} className="flex items-center text-xs bg-muted rounded px-2 py-1">
+                        <FileUp className="h-3 w-3 mr-1" />
+                        {file.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
                 {message.timestamp && (
                   <p className="text-xs text-muted-foreground mt-2">
                     {new Date(message.timestamp).toLocaleTimeString()}
