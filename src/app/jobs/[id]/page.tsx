@@ -9,14 +9,15 @@ import {
   FaRegBookmark,
   FaCheckCircle,
   FaStar,
-  FaRegClock
+  FaRegClock,
 } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import type { Job } from "@/types/types"; 
 
 export default function JobDetailPage() {
   const { id } = useParams();
-  const [job, setJob] = useState<any>(null);
+  const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [savedCount, setSavedCount] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
@@ -78,7 +79,9 @@ export default function JobDetailPage() {
           >
             <FaRegClock className="mr-2" /> My Job Applications
             {appliedCount > 0 && (
-              <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">{appliedCount}</span>
+              <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">
+                {appliedCount}
+              </span>
             )}
           </Link>
           <Link
@@ -87,7 +90,9 @@ export default function JobDetailPage() {
           >
             <FaRegBookmark className="mr-2" /> Saved Jobs
             {savedCount > 0 && (
-              <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">{savedCount}</span>
+              <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">
+                {savedCount}
+              </span>
             )}
           </Link>
         </nav>
@@ -99,12 +104,22 @@ export default function JobDetailPage() {
           <div className="flex justify-between items-start">
             <div>
               <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-2">
-                {job.title} <FaCheckCircle className={job.verified ? "text-green-600 text-xl" : "text-gray-400 text-xl"} />
+                {job.title}{" "}
+                <FaCheckCircle
+                  className={
+                    job.verified
+                      ? "text-green-600 text-xl"
+                      : "text-gray-400 text-xl"
+                  }
+                />
               </h1>
               <p className="text-gray-700 text-sm mt-1">
-                {new Date(job.date).toLocaleDateString()} | {job.location}, {job.job_type}
+                {new Date(job.date).toLocaleDateString()} | {job.location},{" "}
+                {job.job_type}
               </p>
-              <p className="text-gray-600 text-md mt-1 font-medium">{job.company}</p>
+              <p className="text-gray-600 text-md mt-1 font-medium">
+                {job.company}
+              </p>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -116,9 +131,11 @@ export default function JobDetailPage() {
               </button>
               <button
                 onClick={handleSave}
-                className={`${isSaved ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white font-semibold py-2 px-6 rounded`}
+                className={`${
+                  isSaved ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
+                } text-white font-semibold py-2 px-6 rounded`}
               >
-                {isSaved ? 'Saved' : 'Save'}
+                {isSaved ? "Saved" : "Save"}
               </button>
             </div>
           </div>
@@ -141,7 +158,7 @@ export default function JobDetailPage() {
             <div>
               <h2 className="text-lg font-semibold mb-2">Benefits</h2>
               <ul className="list-disc list-inside text-gray-700 text-sm">
-                {job.benefits?.map((b: string, i: number) => (
+                {job.benefits?.map((b, i) => (
                   <li key={i}>{b}</li>
                 ))}
               </ul>
@@ -149,7 +166,7 @@ export default function JobDetailPage() {
             <div>
               <h2 className="text-lg font-semibold mb-2">Skills Needed</h2>
               <ul className="list-disc list-inside text-gray-700 text-sm">
-                {job.skills?.map((s: string, i: number) => (
+                {job.skills?.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
               </ul>
@@ -163,10 +180,16 @@ export default function JobDetailPage() {
             <div className="bg-white p-6 rounded shadow-xl space-y-4">
               <p className="text-lg font-medium">Did you apply for this job?</p>
               <div className="flex justify-end gap-4">
-                <Button onClick={() => confirmApplication(true)} className="bg-green-600 hover:bg-green-700 text-white">
+                <Button
+                  onClick={() => confirmApplication(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
                   Yes
                 </Button>
-                <Button onClick={() => confirmApplication(false)} className="bg-gray-300 text-black">
+                <Button
+                  onClick={() => confirmApplication(false)}
+                  className="bg-gray-300 text-black"
+                >
                   No
                 </Button>
               </div>
@@ -177,6 +200,160 @@ export default function JobDetailPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
