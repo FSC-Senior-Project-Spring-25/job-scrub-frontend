@@ -12,6 +12,7 @@ interface Message {
   timestamp?: number;
   files?: Array<{
     name: string;
+    type: string;
   }>;
 }
 
@@ -33,11 +34,24 @@ export default function ResumeEnhancer() {
   const [conversationHistory, setConversationHistory] = useState<any[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (files.some(f => f.type === "application/pdf")) {
+      setSuggestions([
+        "Can you summarize my resume?",
+        "How can I improve my work experience section?",
+        "What keywords are missing for my target job?"
+      ]);
+    } else {
+      setSuggestions([]);
+    }
+  }, [files]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -47,7 +61,10 @@ export default function ResumeEnhancer() {
       role: "user",
       content: input,
       timestamp: Date.now(),
-      files: files.map(file => ({ name: file.name }))
+      files: files.map(file => ({ 
+        name: file.name,
+        type: file.type
+      }))
     };
     
     setMessages(prev => [...prev, userMessage]);
@@ -110,7 +127,8 @@ export default function ResumeEnhancer() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+      const newFiles = Array.from(e.target.files);
+      setFiles(prev => [...prev, ...newFiles]);
     }
   };
 
@@ -122,11 +140,40 @@ export default function ResumeEnhancer() {
     fileInputRef.current?.click();
   };
 
+  const renderFilePreview = (file: File) => {
+    if (file.type === "application/pdf") {
+      return (
+        <div className="flex items-center justify-center h-full flex-col">
+          <FileText className="h-10 w-10 text-red-500" />
+          <span className="text-xs mt-1 text-black">PDF File</span>
+          <span className="text-xs text-gray-500">{file.name}</span>
+        </div>
+      );
+    } else if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      return (
+        <div className="h-full w-full flex items-center justify-center">
+          <img 
+            src={url} 
+            alt="Preview" 
+            className="max-h-full max-w-full object-contain"
+            onLoad={() => URL.revokeObjectURL(url)}
+          />
+        </div>
+      );
+    } else {
+      return (
+        <div className="flex items-center justify-center h-full flex-col">
+          <FileText className="h-10 w-10 text-blue-500" />
+          <span className="text-xs mt-1">{file.name}</span>
+        </div>
+      );
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-green-200 to-green-100">
-      {/* Centered Content Column */}
       <div className="flex-1 overflow-hidden max-w-2xl w-full mx-auto flex flex-col p-4 gap-4">
-        {/* Welcome Card (only shows when no messages) */}
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-green-200 w-full text-center">
@@ -149,7 +196,6 @@ export default function ResumeEnhancer() {
           </div>
         )}
 
-        {/* Messages area */}
         <div className="flex-1 overflow-y-auto space-y-4">
           {messages.map((message, index) => (
             <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -176,16 +222,25 @@ export default function ResumeEnhancer() {
                 </div>
                 
                 {message.files && message.files.length > 0 && (
-                  <div className="mt-2 space-y-1">
+                  <div className="mt-2 space-y-2">
                     {message.files.map((file, fileIndex) => (
-                      <div 
-                        key={fileIndex} 
-                        className={`flex items-center text-xs rounded-full px-2 py-1 ${message.role === "user" 
-                          ? "bg-green-500 text-green-50" 
-                          : "bg-green-100 text-green-800"}`}
-                      >
-                        <FileUp className="h-3 w-3 mr-1" />
-                        <span className="truncate max-w-[120px]">{file.name}</span>
+                      <div key={fileIndex} className="bg-white rounded-lg border border-green-200 p-2">
+                        <div className="text-xs font-medium text-green-700 mb-1">
+                          {file.name}
+                        </div>
+                        <div className="h-40 border rounded flex items-center justify-center bg-gray-50">
+                          {file.type === "application/pdf" ? (
+                            <div className="flex items-center justify-center h-full flex-col">
+                              <FileText className="h-10 w-10 text-red-500" />
+                              <span className="text-xs mt-1 text-black">PDF File</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center h-full flex-col">
+                              <FileText className="h-10 w-10 text-blue-500" />
+                              <span className="text-xs mt-1">Document attached</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -196,28 +251,46 @@ export default function ResumeEnhancer() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* File attachments */}
+        {suggestions.length > 0 && messages.length === 0 && (
+          <div className="bg-white p-3 rounded-lg border border-green-200">
+            <h3 className="text-xs font-medium text-green-700 mb-2">Try asking:</h3>
+            <div className="flex flex-wrap gap-2">
+              {suggestions.map((suggestion, i) => (
+                <button
+                  key={i}
+                  onClick={() => setInput(suggestion)}
+                  className="text-xs bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1 rounded-full"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {files.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {files.map((file, index) => (
-              <div 
-                key={index} 
-                className="flex items-center bg-white rounded-full px-3 py-1 text-sm text-green-800 border border-green-200"
-              >
-                <FileUp className="h-3 w-3 mr-1 text-green-600" />
-                <span className="truncate max-w-[100px]">{file.name}</span>
-                <button 
-                  onClick={() => removeFile(index)}
-                  className="ml-1 text-green-600 hover:text-green-800"
-                >
-                  <XCircle size={14} />
-                </button>
+              <div key={index} className="group relative bg-white rounded-lg border border-green-200 p-2 w-full max-w-[200px]">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-medium text-green-700 truncate">
+                    {file.name}
+                  </span>
+                  <button 
+                    onClick={() => removeFile(index)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="h-32 border rounded bg-gray-50">
+                  {renderFilePreview(file)}
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Input form */}
         <form onSubmit={handleSubmit} className="sticky bottom-0 bg-white rounded-xl border border-green-200 shadow-sm p-3">
           <Textarea
             value={input}
@@ -234,7 +307,7 @@ export default function ResumeEnhancer() {
                 onChange={handleFileChange}
                 className="hidden"
                 multiple
-                accept=".pdf,.doc,.docx,.txt"
+                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
               />
               <Button 
                 type="button" 
@@ -270,7 +343,6 @@ export default function ResumeEnhancer() {
           </div>
         </form>
 
-        {/* Agent indicator (floating) */}
         {selectedAgent && (
           <div className="absolute top-4 right-4 text-xs bg-white rounded-full px-3 py-1 shadow-sm border border-green-200 text-green-700 flex items-center gap-1">
             <Bot className="h-3 w-3" />
