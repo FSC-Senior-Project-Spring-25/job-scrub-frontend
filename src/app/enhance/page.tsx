@@ -41,8 +41,9 @@ export default function ResumeEnhancer() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Update suggestions when files change or messages reset
   useEffect(() => {
-    if (files.some(f => f.type === "application/pdf")) {
+    if (files.length > 0) {
       setSuggestions([
         "Can you summarize my resume?",
         "How can I improve my work experience section?",
@@ -51,7 +52,7 @@ export default function ResumeEnhancer() {
     } else {
       setSuggestions([]);
     }
-  }, [files]);
+  }, [files, messages]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -128,7 +129,24 @@ export default function ResumeEnhancer() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
-      setFiles(prev => [...prev, ...newFiles]);
+      // Accept  only accept PDF files
+      const pdfFiles = newFiles.filter(file => file.type === "application/pdf");
+      
+      if (pdfFiles.length === 0 && newFiles.length > 0) {
+        // Show error if any other files were selected
+        setMessages(prev => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "Please upload only PDF files for resumes.",
+            timestamp: Date.now()
+          }
+        ]);
+        return;
+      }
+      
+      // Only set PDF files
+      setFiles(prev => [...prev, ...pdfFiles]);
     }
   };
 
@@ -141,39 +159,17 @@ export default function ResumeEnhancer() {
   };
 
   const renderFilePreview = (file: File) => {
-    if (file.type === "application/pdf") {
-      return (
-        <div className="flex items-center justify-center h-full flex-col">
-          <FileText className="h-10 w-10 text-red-500" />
-          <span className="text-xs mt-1 text-black">PDF File</span>
-          <span className="text-xs text-gray-500">{file.name}</span>
-        </div>
-      );
-    } else if (file.type.startsWith("image/")) {
-      const url = URL.createObjectURL(file);
-      return (
-        <div className="h-full w-full flex items-center justify-center">
-          <img 
-            src={url} 
-            alt="Preview" 
-            className="max-h-full max-w-full object-contain"
-            onLoad={() => URL.revokeObjectURL(url)}
-          />
-        </div>
-      );
-    } else {
-      return (
-        <div className="flex items-center justify-center h-full flex-col">
-          <FileText className="h-10 w-10 text-blue-500" />
-          <span className="text-xs mt-1">{file.name}</span>
-        </div>
-      );
-    }
+    return (
+      <div className="flex items-center justify-center h-full flex-col">
+        <FileText className="h-10 w-10 text-red-500" />
+        <span className="text-xs mt-1 text-black">PDF File</span>
+        <span className="text-xs text-gray-500">{file.name}</span>
+      </div>
+    );
   };
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-green-200 to-green-100">
-      {/* Changed max-w-2xl to max-w-3xl for 15% wider container */}
       <div className="flex-1 overflow-hidden max-w-3xl w-full mx-auto flex flex-col p-4 gap-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full">
@@ -187,7 +183,7 @@ export default function ResumeEnhancer() {
                 <FileText className="h-5 w-5" /> Resume Enhancer Chatbot
               </h2>
               <p className="text-sm text-gray-600 mb-4">
-                Upload your resume and get personalized improvement suggestions
+                Upload your resume (PDF only) and get personalized improvement suggestions
               </p>
               <div className="flex items-center justify-center gap-2 text-xs text-green-700 bg-green-50 rounded-full py-1 px-3 w-fit mx-auto">
                 <Bot className="h-3 w-3" />
@@ -230,17 +226,10 @@ export default function ResumeEnhancer() {
                           {file.name}
                         </div>
                         <div className="h-40 border rounded flex items-center justify-center bg-gray-50">
-                          {file.type === "application/pdf" ? (
-                            <div className="flex items-center justify-center h-full flex-col">
-                              <FileText className="h-10 w-10 text-red-500" />
-                              <span className="text-xs mt-1 text-black">PDF File</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center h-full flex-col">
-                              <FileText className="h-10 w-10 text-blue-500" />
-                              <span className="text-xs mt-1">Document attached</span>
-                            </div>
-                          )}
+                          <div className="flex items-center justify-center h-full flex-col">
+                            <FileText className="h-10 w-10 text-red-500" />
+                            <span className="text-xs mt-1 text-black">PDF File</span>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -252,7 +241,7 @@ export default function ResumeEnhancer() {
           <div ref={messagesEndRef} />
         </div>
 
-        {suggestions.length > 0 && messages.length === 0 && (
+        {suggestions.length > 0 && (
           <div className="bg-white p-3 rounded-lg border border-green-200">
             <h3 className="text-xs font-medium text-green-700 mb-2">Try asking:</h3>
             <div className="flex flex-wrap gap-2">
@@ -308,7 +297,7 @@ export default function ResumeEnhancer() {
                 onChange={handleFileChange}
                 className="hidden"
                 multiple
-                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                accept=".pdf,application/pdf"
               />
               <Button 
                 type="button" 
@@ -319,7 +308,7 @@ export default function ResumeEnhancer() {
                 className="text-green-700 hover:bg-green-50"
               >
                 <FileUp className="h-4 w-4 mr-1" />
-                <span className="text-sm font-bold">Attach</span>
+                <span className="text-sm font-bold">Attach PDF resume</span>
               </Button>
             </div>
             
