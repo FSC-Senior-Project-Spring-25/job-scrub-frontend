@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ id_token: idToken }),
+      body: JSON.stringify({ idToken: idToken }),
       credentials: 'include', // Important for cookie handling
     });
     
