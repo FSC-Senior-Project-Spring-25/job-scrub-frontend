@@ -1,19 +1,40 @@
-"use client";
+'use client';
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { FaRegBookmark, FaCheckCircle, FaRegClock } from "react-icons/fa";
+import {
+  FaBriefcase,
+  FaMapMarkerAlt,
+  FaDollarSign,
+  FaRegBookmark,
+  FaCheckCircle,
+  FaRegClock,
+} from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import type { Job } from "@/types/types";
 import { useAuth } from "@/app/auth-context";
 
-type AuthUser = { uid: string };
+
+function keywordMatchScore(resumeKeywords: string[], jobSkills: string[]): number {
+  if (!resumeKeywords.length || !jobSkills.length) return 0;
+
+  const lowerResume = resumeKeywords.map(k => k.toLowerCase().trim());
+
+  const matches = jobSkills.filter(skill =>
+    lowerResume.some(keyword => skill.toLowerCase().includes(keyword))
+  );
+
+  console.log("✅ Matched Skills:", matches);
+  return matches.length / jobSkills.length;
+}
 
 export default function JobDetailPage() {
   const { id } = useParams();
-  const { user }: { user: AuthUser | null } = useAuth();
-  const [job, setJob] = useState<Job & { id?: string } | null>(null);
+  const { user } = useAuth();
+  const uuid = user?.uid;
+
+  const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [savedCount, setSavedCount] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
@@ -21,90 +42,58 @@ export default function JobDetailPage() {
   const [showModal, setShowModal] = useState(false);
   const [matchScore, setMatchScore] = useState<number | null>(null);
 
-  // Fetch job by ID
+
+  const resumeIndexHost = 'https://resumes-y2cd4or.svc.aped-4627-b74a.pinecone.io';
+  const apiKey = 'pcsk_5sSQKM_NhUes3FG76gZECqUrb4TwfzjCUZyjmnQbrkFEirw8CAKhiWuGeUM3seAuk4wKd9';
+
   useEffect(() => {
     if (!id) return;
-
+  
     fetch("/api/job/unverified")
       .then((res) => res.json())
-      .then((data: Record<string, Job>) => {
+      .then((data) => {
         const found = data[id as string];
         if (found) {
-          console.log("Job found:", found);
-          setJob({ ...found, id: id as string }); // ✅ Add the ID manually
+          setJob(found);
+  
+          
+          if (found.skills?.length && uuid) {
+            fetch(`${resumeIndexHost}/vectors/fetch?ids=${uuid}&namespace=resumes`, {
+              headers: {
+                "Api-Key": apiKey,
+                "Content-Type": "application/json",
+              },
+            })
+              .then((res) => res.json())
+              .then((data) => {
+                const vector = data.vectors?.[uuid];
+                const resumeKeywords: string[] = vector?.metadata?.keywords || [];
+  
+                console.log("🧠 Resume keywords:", resumeKeywords);
+                console.log("💼 Job skills:", found.skills);
+  
+                const score = keywordMatchScore(resumeKeywords, found.skills);
+                setMatchScore(score);
+              })
+              .catch((err) => console.error("❌ Failed to fetch resume vector:", err));
+          }
+        } else {
+          console.warn("⚠️ Job not found for ID:", id);
         }
       })
-      .catch((err) => console.error("Failed to fetch job:", err))
+      .catch((err) => {
+        console.error("❌ Failed to fetch job:", err);
+      })
       .finally(() => setLoading(false));
-  }, [id]);
-
-  // Calculate match score
-  useEffect(() => {
-    const calculateMatchScore = async () => {
-      console.log("Calculating match score...");
-      if (!user?.uid || !job?.id) {
-        console.log("Missing user or job id");
-        return;
-      }
-
-      try {
-        // Fetch resume vector
-        const resumeRes = await fetch("http://localhost:8000/api/resumes_vector", {
-          credentials: "include", // Ensure credentials are passed if needed
-        });
-
-        const resumeData = await resumeRes.json();
-        console.log("Resume data received:", resumeData);
-
-        const resumeVector: number[] = Array.isArray(resumeData.vector) ? resumeData.vector : [];
-        if (!resumeVector.length) {
-          console.warn("Invalid resume vector data");
-          return;
-        }
-        console.log("Resume vector received:", resumeVector);
-
-        // Fetch job vector
-        const jobVectorRes = await fetch(`http://localhost:8000/api/jobs/vector?job_id=${job.id}`);
-        const jobVectorData = await jobVectorRes.json();
-        console.log("Job vector data received:", jobVectorData);
-
-        const jobVector: number[] = Array.isArray(jobVectorData.vector) ? jobVectorData.vector : [];
-        if (!jobVector.length) {
-          console.warn("Invalid job vector data");
-          return;
-        }
-        console.log("Job vector received:", jobVector);
-
-        // Check if vectors have the same length
-        if (resumeVector.length !== jobVector.length) {
-          console.warn("Vector length mismatch:", resumeVector.length, jobVector.length);
-          return;
-        }
-
-        // Calculate match score (Cosine Similarity)
-        const dot = resumeVector.reduce((acc, val, i) => acc + val * jobVector[i], 0);
-        const magA = Math.sqrt(resumeVector.reduce((sum, val) => sum + val ** 2, 0));
-        const magB = Math.sqrt(jobVector.reduce((sum, val) => sum + val ** 2, 0));
-        const similarity = dot / (magA * magB);
-
-        if (isNaN(similarity)) {
-          console.warn("Invalid match score calculation");
-          return;
-        }
-
-        console.log("Match Score:", similarity);
-        setMatchScore(similarity);
-      } catch (err) {
-        console.error("Failed to calculate match score:", err);
-      }
-    };
-
-    calculateMatchScore();
-  }, [job, user]);
-
+  }, [id, uuid]);
+  
   const handleSave = () => {
-    setIsSaved((prev) => !prev);
-    setSavedCount((prev) => (isSaved ? Math.max(prev - 1, 0) : prev + 1));
+    if (isSaved) {
+      setSavedCount((prev) => Math.max(prev - 1, 0));
+    } else {
+      setSavedCount((prev) => prev + 1);
+    }
+    setIsSaved(!isSaved);
   };
 
   const handleApply = () => {
@@ -128,7 +117,10 @@ export default function JobDetailPage() {
       <div className="bg-white rounded-lg shadow p-4 h-fit self-start w-64 mr-6">
         <h2 className="font-semibold text-lg mb-4">Quick Links</h2>
         <nav className="space-y-2">
-          <Link href="/jobs" className="flex px-3 py-2 rounded hover:bg-gray-100 items-center">
+          <Link
+            href="/jobs"
+            className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+          >
             <FaRegClock className="mr-2" /> My Job Applications
             {appliedCount > 0 && (
               <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">
@@ -136,7 +128,10 @@ export default function JobDetailPage() {
               </span>
             )}
           </Link>
-          <Link href="/saved" className="flex px-3 py-2 rounded hover:bg-gray-100 items-center">
+          <Link
+            href="/saved"
+            className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+          >
             <FaRegBookmark className="mr-2" /> Saved Jobs
             {savedCount > 0 && (
               <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">
@@ -154,17 +149,83 @@ export default function JobDetailPage() {
             <div>
               <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-2">
                 {job.title}{" "}
-                <FaCheckCircle className={job.verified ? "text-green-600 text-xl" : "text-gray-400 text-xl"} />
+                <FaCheckCircle
+                  className={
+                    job.verified
+                      ? "text-green-600 text-xl"
+                      : "text-gray-400 text-xl"
+                  }
+                />
               </h1>
               <p className="text-gray-700 text-sm mt-1">
-                {new Date(job.date).toLocaleDateString()} | {job.location}, {job.job_type}
+                {new Date(job.date).toLocaleDateString()} | {job.location},{" "}
+                {job.job_type}
               </p>
-              <p className="text-gray-600 text-md mt-1 font-medium">{job.company}</p>
+              <p className="text-gray-600 text-md mt-1 font-medium">
+                {job.company}
+              </p>
+ 
+ 
+
               {matchScore !== null && (
-                <p className="text-sm text-blue-700 mt-2">
-                  Match Score: {(matchScore * 100).toFixed(1)}%
-                </p>
-              )}
+    <div className="mt-6 space-y-4">
+    <h3 className="text-md font-semibold">Am I a good fit?</h3>
+
+    <div className="flex items-center gap-5">
+      {/* Circular Progress Ring */}
+      <div className="relative w-20 h-20">
+        <svg className="transform -rotate-90" width="80" height="80">
+          <circle
+            cx="40"
+            cy="40"
+            r="34"
+            stroke="#e5e7eb"
+            strokeWidth="8"
+            fill="transparent"
+          />
+          <circle
+            cx="40"
+            cy="40"
+            r="34"
+            stroke={
+              matchScore < 0.3
+                ? "#ef4444"
+                : matchScore < 0.6
+                ? "#facc15"
+                : "#22c55e"
+            }
+            strokeWidth="8"
+            strokeDasharray={2 * Math.PI * 34}
+            strokeDashoffset={
+              2 * Math.PI * 34 * (1 - matchScore)
+            }
+            strokeLinecap="round"
+            fill="transparent"
+            className="transition-all duration-500"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-gray-800">
+          {(matchScore * 100).toFixed(0)}%
+        </div>
+      </div>
+
+      {/* Feedback Message */}
+      <div className="text-sm text-gray-700 font-medium">
+        You are {(matchScore * 100).toFixed(0)}% compatible with the job description.
+        {matchScore < 0.3 && (
+          <div className="mt-1 text-red-600">Let’s improve your resume!</div>
+        )}
+        {matchScore >= 0.3 && matchScore < 0.6 && (
+          <div className="mt-1 text-yellow-700">We can help with that!</div>
+        )}
+        {matchScore >= 0.6 && (
+          <div className="mt-1 text-green-700 font-semibold">🎉 Great fit! Go get it!</div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
             </div>
 
             <div className="flex flex-col gap-2">
@@ -176,7 +237,9 @@ export default function JobDetailPage() {
               </button>
               <button
                 onClick={handleSave}
-                className={`${isSaved ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"} text-white font-semibold py-2 px-6 rounded`}
+                className={`${
+                  isSaved ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
+                } text-white font-semibold py-2 px-6 rounded`}
               >
                 {isSaved ? "Saved" : "Save"}
               </button>
@@ -185,7 +248,9 @@ export default function JobDetailPage() {
 
           <div>
             <h2 className="text-lg font-semibold mb-1">Job Description</h2>
-            <p className="text-gray-800 whitespace-pre-line text-sm leading-relaxed">{job.description}</p>
+            <p className="text-gray-800 whitespace-pre-line text-sm leading-relaxed">
+              {job.description}
+            </p>
           </div>
 
           {job.salary && (
@@ -215,16 +280,22 @@ export default function JobDetailPage() {
           </div>
         </div>
 
-        {/* Modal */}
+        {/* Modal for application confirmation */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded shadow-xl space-y-4">
               <p className="text-lg font-medium">Did you apply for this job?</p>
               <div className="flex justify-end gap-4">
-                <Button onClick={() => confirmApplication(true)} className="bg-green-600 hover:bg-green-700 text-white">
+                <Button
+                  onClick={() => confirmApplication(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
                   Yes
                 </Button>
-                <Button onClick={() => confirmApplication(false)} className="bg-gray-300 text-black">
+                <Button
+                  onClick={() => confirmApplication(false)}
+                  className="bg-gray-300 text-black"
+                >
                   No
                 </Button>
               </div>
@@ -235,39 +306,6 @@ export default function JobDetailPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
