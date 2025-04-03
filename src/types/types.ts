@@ -33,6 +33,7 @@ export interface JobReport {
 }
 
 export interface Job {
+  id: string;
   company: string;
   date: string;
   description: string;
