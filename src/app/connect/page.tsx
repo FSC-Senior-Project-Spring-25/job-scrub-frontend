@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { useAuth } from "../auth-context";
 import { toast } from "sonner";
 import AnimatedLogo from "@/components/animated-logo";
+import ChatPopup from "@/components/messages/chat-popup"; // Import the ChatPopup component
 
 interface Comment {
   id: string;
@@ -389,9 +390,12 @@ export default function ConnectFeed() {
                 )}
               </CardContent>
             </Card>
-          ))
+            
+          ))          
+            
         )}
       </div>
+      <ChatPopup /> {/* Include the ChatPopup component here */}
     </div>
   );
 }
