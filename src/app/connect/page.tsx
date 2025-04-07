@@ -24,6 +24,7 @@ interface Post {
   likes: number;
   comments: Comment[];
   userHasLiked?: boolean;
+  authorUid?: string; 
 }
 
 export default function ConnectFeed() {
@@ -242,6 +243,33 @@ export default function ConnectFeed() {
       fetchPosts();
     }
   }
+  async function handleFollow(targetUid: string) {
+  if (!user) return; // Must be logged in
+  try {
+    const token = await user.getIdToken();
+    const currentUserUid = user.uid; // current user's doc ID
+    const response = await fetch(
+      `/follows/users/${currentUserUid}/follow?target_id=${targetUid}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Follow error");
+    }
+    const data = await response.json();
+    console.log("Follow success:", data.message);
+    toast.success("Now following!");
+  } catch (error) {
+    console.error("Error following user:", error);
+    toast.error("Error following user");
+  }
+}
 
   if (loading || authLoading || !user) {
     return (
@@ -298,10 +326,22 @@ export default function ConnectFeed() {
             No posts yet. Be the first to share something!
           </p>
         ) : (
-          posts.map((post) => (
+          {posts.map((post) => (
             <Card key={post.id} className="mb-4">
               <CardContent className="p-4">
-                <p className="font-semibold">{post.author}</p>
+                {/* This div groups the author's name and the follow button */}
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold">{post.author}</p>
+                  {post.authorUid && post.authorUid !== user.uid && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleFollow(post.authorUid)}
+                    >
+                      Follow
+                    </Button>
+                  )}
+                </div>
                 <p className="text-gray-700 mt-2 whitespace-pre-wrap">
                   {post.content}
                 </p>
@@ -335,7 +375,7 @@ export default function ConnectFeed() {
                     {post.comments?.length || 0}
                   </Button>
                 </div>
-
+          
                 {showComments[post.id] && (
                   <div className="mt-4 border-t pt-3">
                     <div className="flex gap-2 mb-3">
@@ -359,7 +399,7 @@ export default function ConnectFeed() {
                         <Send className="w-4 h-4" />
                       </Button>
                     </div>
-
+          
                     {post.comments && post.comments.length > 0 ? (
                       post.comments.map((comment, idx) => (
                         <div
@@ -389,6 +429,8 @@ export default function ConnectFeed() {
                 )}
               </CardContent>
             </Card>
+          ))}
+
           ))
         )}
       </div>
