@@ -142,13 +142,13 @@ export default function HomePage() {
               <h2 className="font-semibold text-lg mb-4">Quick Links</h2>
               <nav className="space-y-2">
                 <Link
-                  href="/jobs"
+                  href="/applications"
                   className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
                 >
                   <FaRegClock className="mr-2" /> My Job Applications
                 </Link>
                 <Link
-                  href="/saved"
+                  href="/saved_jobs"
                   className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
                 >
                   <FaRegBookmark className="mr-2" /> Saved Jobs
