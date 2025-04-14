@@ -53,6 +53,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
   // Add refs for dropdown menus
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
+  const profilePath = user ? `/profile/${user.uid}` : "/login";
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const toggleProfileMenu = () => setIsProfileMenuOpen(!isProfileMenuOpen);
@@ -151,7 +152,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                       className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50"
                     >
                       <Link
-                        href="/profile"
+                        href={profilePath}
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         onClick={() => setIsProfileMenuOpen(false)}
                       >
@@ -210,7 +211,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
             {user && (
               <>
                 <Link
-                  href="/profile"
+                  href={profilePath}
                   className="flex items-center text-gray-700 hover:text-green-600 hover:bg-gray-50 transition-colors px-3 py-2 rounded"
                   onClick={toggleMenu}
                 >
