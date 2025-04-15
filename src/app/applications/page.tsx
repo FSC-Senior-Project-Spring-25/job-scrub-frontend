@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/app/auth-context';
 import { db } from '@/app/firebase';
+import ApplicationUpdatePrompt from "@/components/job/application-update";
 import {
   collection,
   getDocs,
@@ -182,51 +183,54 @@ export default function MyApplicationsPage() {
                 <FaBriefcase className="text-green-600 text-xl mt-1 shrink-0" />
 
                 <div className="flex-1">
-                  <Link href={`/jobs/${job.id}`} className="block">
-                    <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                      {job.title}
-                      {job.verified && <FaCheckCircle className="text-green-600 text-sm" />}
-                      {job.url && (
-                        <a
-                          href={job.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 ml-1"
-                          title="Go to job posting"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <FaExternalLinkAlt />
-                        </a>
-                      )}
-                    </h2>
-                    <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
-                      <FaBuilding /> {job.company}
-                    </p>
-                    <p className="text-sm text-gray-600 flex items-center gap-1">
-                      <FaMapMarkerAlt /> {job.location} | {job.workType}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Applied: {app.appliedAt?.toDate?.().toLocaleDateString?.() || '—'}
-                    </p>
-                  </Link>
-                </div>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/jobs/${job.id}`}>
+                          <h2 className="text-xl font-semibold text-gray-800 hover:underline flex items-center gap-2">
+                            {job.title}
+                            {job.verified && <FaCheckCircle className="text-green-600 text-sm" />}
+                          </h2>
+                        </Link>
+
+                        {/* External link icon – NOT nested in Link */}
+                        {job.url && (
+                          <a
+                            href={job.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Go to job posting"
+                            className="text-blue-600 hover:text-blue-800"
+                            onClick={(e) => e.stopPropagation()} // Prevent bubbling if needed
+                          >
+                            <FaExternalLinkAlt />
+                          </a>
+                        )}
+                      </div>
+
+                      <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+                        <FaBuilding /> {job.company}
+                      </p>
+                      <p className="text-sm text-gray-600 flex items-center gap-1">
+                        <FaMapMarkerAlt /> {job.location} | {job.workType}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Applied: {app.appliedAt?.toDate?.().toLocaleDateString?.() || '—'}
+                      </p>
+                    </div>
+
               </div>
 
               <div className="flex flex-col items-end justify-start min-w-[140px] ml-4 gap-2">
-                <label htmlFor="status" className="text-sm font-medium text-gray-600">
-                  Status
-                </label>
-                <select
-                  value={app.status}
-                  onChange={(e) => updateStatus(job.id, e.target.value, app.status)}
-                  className="px-3 py-2 rounded-md border border-gray-300 bg-white text-gray-800 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-gray-400 transition duration-150 capitalize"
-                >
-                  {statusOptions.map(status => (
-                    <option key={status} value={status}>
-                      {status.replace('_', ' ')}
-                    </option>
-                  ))}
-                </select>
+                {user?.uid && (
+                  <ApplicationUpdatePrompt
+                  userId={user.uid}
+                  jobId={job.id}
+                  company={job.company}
+                  //currentStatus={app.status} 
+                  onStatusUpdateAction={(status) =>
+                    updateStatus(job.id, status, app.status)
+                  }
+                />
+                )}
                 <button
                   onClick={() => deleteApplication(job.id, app.status)}
                   className="text-red-600 hover:text-red-800 text-xs flex items-center gap-1"
