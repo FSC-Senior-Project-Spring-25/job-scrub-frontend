@@ -15,6 +15,7 @@ import Link from "next/link";
 import type { Job } from "@/types/types";
 import { useAuth } from "@/app/auth-context";
 import { db } from "@/app/firebase";
+import CompanyMetrics from "@/components/job/company-metrics";
 import {
   doc,
   getDoc,
@@ -174,6 +175,7 @@ export default function JobDetailPage() {
             )}
           </Link>
         </nav>
+        {job?.company && <CompanyMetrics companyName={job.company} />}
       </div>
 
             
