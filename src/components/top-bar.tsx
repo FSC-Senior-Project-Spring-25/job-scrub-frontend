@@ -47,7 +47,7 @@ const defaultNavItems: NavItem[] = [
 export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const router = useRouter();
 
   // Add refs for dropdown menus
@@ -125,7 +125,12 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
 
           {/* User Actions */}
           <div className="flex items-center">
-            {user ? (
+            {loading ? (
+              // Show loading indicator instead of auth UI
+              <div className="flex items-center text-gray-500">
+                <div className="animate-pulse h-8 w-24 bg-gray-200 rounded" />
+              </div>
+            ) : user ? (
               <div className="flex items-center">
                 <div className="hidden lg:block mr-4">
                   <span className="text-sm text-gray-600">
@@ -181,19 +186,21 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
               </Link>
             )}
 
-            <button
-              onClick={toggleMenu}
-              className="lg:hidden text-gray-700 hover:text-green-600 transition-colors ml-4"
-              aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-            >
-              {isMenuOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
-            </button>
+            {!loading && (
+              <button
+                onClick={toggleMenu}
+                className="lg:hidden text-gray-700 hover:text-green-600 transition-colors ml-4"
+                aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+              >
+                {isMenuOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Mobile menu */}
-      {isMenuOpen && (
+      {isMenuOpen && !loading && (
         <div className="lg:hidden absolute w-full bg-white shadow-lg">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {navItems.map((item) => (
