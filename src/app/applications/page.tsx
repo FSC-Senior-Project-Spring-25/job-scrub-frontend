@@ -9,7 +9,6 @@ import {
   getDocs,
   doc,
   updateDoc,
-  deleteDoc,
   setDoc,
   increment,
   serverTimestamp
@@ -20,8 +19,7 @@ import {
   FaMapMarkerAlt,
   FaBuilding,
   FaCheckCircle,
-  FaExternalLinkAlt,
-  FaTrashAlt
+  FaExternalLinkAlt
 } from 'react-icons/fa';
 
 interface Job {
@@ -121,28 +119,6 @@ export default function MyApplicationsPage() {
     }
   };
 
-  const deleteApplication = async (jobId: string, status: string) => {
-    if (!user?.uid || !status) return;
-    const confirm = window.confirm("Are you sure you want to delete this application?");
-    if (!confirm) return;
-
-    try {
-      const userRef = doc(db, "users", user.uid, "applications", jobId);
-      const statsRef = doc(db, "jobStats", jobId);
-
-      await deleteDoc(userRef);
-      await setDoc(statsRef, {
-        [status]: increment(-1),
-        totalApplicants: increment(-1),
-        lastUpdated: serverTimestamp(),
-      }, { merge: true });
-
-      setApplications(prev => prev.filter(entry => entry.job.id !== jobId));
-    } catch (err) {
-      console.error("❌ Failed to delete application:", err);
-    }
-  };
-
   const getBorderColor = (status: string) => {
     switch (status) {
       case 'rejected':
@@ -183,60 +159,51 @@ export default function MyApplicationsPage() {
                 <FaBriefcase className="text-green-600 text-xl mt-1 shrink-0" />
 
                 <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Link href={`/jobs/${job.id}`}>
-                          <h2 className="text-xl font-semibold text-gray-800 hover:underline flex items-center gap-2">
-                            {job.title}
-                            {job.verified && <FaCheckCircle className="text-green-600 text-sm" />}
-                          </h2>
-                        </Link>
+                  <div className="flex items-center gap-2">
+                    <Link href={`/jobs/${job.id}`}>
+                      <h2 className="text-xl font-semibold text-gray-800 hover:underline flex items-center gap-2">
+                        {job.title}
+                        {job.verified && <FaCheckCircle className="text-green-600 text-sm" />}
+                      </h2>
+                    </Link>
 
-                        {/* External link icon – NOT nested in Link */}
-                        {job.url && (
-                          <a
-                            href={job.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Go to job posting"
-                            className="text-blue-600 hover:text-blue-800"
-                            onClick={(e) => e.stopPropagation()} // Prevent bubbling if needed
-                          >
-                            <FaExternalLinkAlt />
-                          </a>
-                        )}
-                      </div>
+                    {job.url && (
+                      <a
+                        href={job.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Go to job posting"
+                        className="text-blue-600 hover:text-blue-800"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <FaExternalLinkAlt />
+                      </a>
+                    )}
+                  </div>
 
-                      <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
-                        <FaBuilding /> {job.company}
-                      </p>
-                      <p className="text-sm text-gray-600 flex items-center gap-1">
-                        <FaMapMarkerAlt /> {job.location} | {job.workType}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Applied: {app.appliedAt?.toDate?.().toLocaleDateString?.() || '—'}
-                      </p>
-                    </div>
-
+                  <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+                    <FaBuilding /> {job.company}
+                  </p>
+                  <p className="text-sm text-gray-600 flex items-center gap-1">
+                    <FaMapMarkerAlt /> {job.location} | {job.workType}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Applied: {app.appliedAt?.toDate?.().toLocaleDateString?.() || '—'}
+                  </p>
+                </div>
               </div>
 
               <div className="flex flex-col items-end justify-start min-w-[140px] ml-4 gap-2">
                 {user?.uid && (
                   <ApplicationUpdatePrompt
-                  userId={user.uid}
-                  jobId={job.id}
-                  company={job.company}
-                  //currentStatus={app.status} 
-                  onStatusUpdateAction={(status) =>
-                    updateStatus(job.id, status, app.status)
-                  }
-                />
+                    userId={user.uid}
+                    jobId={job.id}
+                    company={job.company}
+                    onStatusUpdateAction={(status) =>
+                      updateStatus(job.id, status, app.status)
+                    }
+                  />
                 )}
-                <button
-                  onClick={() => deleteApplication(job.id, app.status)}
-                  className="text-red-600 hover:text-red-800 text-xs flex items-center gap-1"
-                >
-                  <FaTrashAlt /> Delete Application
-                </button>
               </div>
             </li>
           ))}
