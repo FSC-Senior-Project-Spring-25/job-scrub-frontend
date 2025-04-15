@@ -1,22 +1,29 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { db } from "../firebase"
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from "firebase/firestore"
 import { toast } from "sonner"
 import { useAuth } from "../auth-context"
-import { Check, ChevronLeft, ChevronRight, FileText, Plus, Trash2, Upload } from "lucide-react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import type * as z from "zod"
+import { Check, ChevronLeft, ChevronRight, FileText, Plus, Briefcase, GraduationCap, User, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Progress } from "@/components/ui/progress"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+
+import AnimatedLogo from "@/components/animated-logo"
+import { FormStep } from "@/components/onboarding/form-step"
+import { ListItem } from "@/components/onboarding/list-item"
+import FileUpload from "@/components/file-upload"
+import { personalInfoSchema, educationSchema, experienceSchema } from "@/lib/schemas"
 
 export default function Onboarding() {
   const router = useRouter()
@@ -39,6 +46,7 @@ export default function Onboarding() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [resumeFileName, setResumeFileName] = useState<string | null>(null)
 
   // Education state
   const [newEducation, setNewEducation] = useState("")
@@ -47,6 +55,53 @@ export default function Onboarding() {
   // Experience state
   const [newExperience, setNewExperience] = useState("")
   const [isAddingExperience, setIsAddingExperience] = useState(false)
+
+  // Form validation
+  const personalInfoForm = useForm<z.infer<typeof personalInfoSchema>>({
+    resolver: zodResolver(personalInfoSchema),
+    defaultValues: {
+      username: "",
+      phone: "",
+      bio: "",
+      isPrivate: false,
+    },
+  })
+
+  const educationForm = useForm<z.infer<typeof educationSchema>>({
+    resolver: zodResolver(educationSchema),
+    defaultValues: {
+      education: "",
+    },
+  })
+
+  const experienceForm = useForm<z.infer<typeof experienceSchema>>({
+    resolver: zodResolver(experienceSchema),
+    defaultValues: {
+      experience: "",
+    },
+  })
+
+  // Fetch resume preview URL
+  const fetchResumePreview = async (resumeId: string) => {
+    if (!user) return
+
+    try {
+      const token = await user.getIdToken()
+      const response = await fetch(`/api/resume/view?key=${encodeURIComponent(resumeId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) throw new Error("Failed to fetch resume preview")
+
+      const data = await response.json()
+      if (data && data.url) {
+        setPreviewUrl(data.url)
+      }
+    } catch (error) {
+      console.error("Error fetching resume preview:", error)
+      toast.error("Failed to load resume preview")
+    }
+  }
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -61,7 +116,7 @@ export default function Onboarding() {
 
         if (userSnap.exists()) {
           const data = userSnap.data()
-          setUserData({
+          const updatedUserData = {
             username: data.username || "",
             email: data.email || user.email || "",
             bio: data.bio || "",
@@ -71,11 +126,23 @@ export default function Onboarding() {
             education: data.education || [],
             experience: data.experience || [],
             resume_id: data.resume_id || null,
-          })
+          }
 
+          setUserData(updatedUserData)
+          setResumeFileName(data.resume_filename || null)
+
+          // If there's a resume ID, fetch the preview URL
           if (data.resume_id) {
             await fetchResumePreview(data.resume_id)
           }
+
+          // Update form default values
+          personalInfoForm.reset({
+            username: updatedUserData.username,
+            phone: updatedUserData.phone,
+            bio: updatedUserData.bio,
+            isPrivate: updatedUserData.isPrivate,
+          })
         }
       } catch (error) {
         console.error("Error fetching user data:", error)
@@ -86,38 +153,7 @@ export default function Onboarding() {
     }
 
     fetchUserData()
-  }, [user, router])
-
-  const fetchResumePreview = async (resumeId: string) => {
-    if (!user) return
-
-    try {
-      const token = await user.getIdToken()
-      const response = await fetch(`/api/resume/view?key=${encodeURIComponent(resumeId)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) throw new Error("Failed to fetch preview")
-
-      const blob = await response.blob()
-      setPreviewUrl(URL.createObjectURL(blob))
-    } catch (error) {
-      console.error("Preview error:", error)
-      toast.error("Failed to load resume preview")
-    }
-  }
-
-  // Handle file selection for resume
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      if (file.type !== "application/pdf") {
-        toast.error("Please select a PDF file")
-        return
-      }
-      setSelectedFile(file)
-    }
-  }
+  }, [user, router, personalInfoForm])
 
   // Handle resume upload
   const handleUpload = async () => {
@@ -142,21 +178,25 @@ export default function Onboarding() {
       }
 
       const data = await response.json()
+      console.log("Upload response:", data) // Debug log
 
-      // Update Firestore with the resume ID
+      // Update Firestore with the resume ID and filename
       const userRef = doc(db, "users", user.uid)
       await updateDoc(userRef, {
         resume_id: data.file_id,
+        resume_filename: data.filename || selectedFile.name,
       })
 
+      // Update local state
       setUserData((prev) => ({
         ...prev,
         resume_id: data.file_id,
       }))
+      setResumeFileName(data.filename || selectedFile.name)
 
       toast.success("Resume uploaded successfully")
 
-      // Fetch the preview for the newly uploaded resume
+      // Fetch the preview URL for the newly uploaded resume
       await fetchResumePreview(data.file_id)
     } catch (error) {
       console.error("Upload error:", error)
@@ -180,14 +220,16 @@ export default function Onboarding() {
 
       if (!response.ok) throw new Error("Delete failed")
 
-      // Update Firestore to remove the resume ID
+      // Update Firestore to remove the resume ID and filename
       const userRef = doc(db, "users", user.uid)
       await updateDoc(userRef, {
         resume_id: null,
+        resume_filename: null,
       })
 
       // Reset state
       setPreviewUrl(null)
+      setResumeFileName(null)
       setUserData((prev) => ({
         ...prev,
         resume_id: null,
@@ -201,21 +243,21 @@ export default function Onboarding() {
   }
 
   // Handle add education
-  const handleAddEducation = async () => {
-    if (!newEducation.trim() || !user) return
+  const handleAddEducation = async (values: z.infer<typeof educationSchema>) => {
+    if (!user) return
 
     try {
       const userRef = doc(db, "users", user.uid)
       await updateDoc(userRef, {
-        education: arrayUnion(newEducation),
+        education: arrayUnion(values.education),
       })
 
       setUserData((prev) => ({
         ...prev,
-        education: [...prev.education, newEducation],
+        education: [...prev.education, values.education],
       }))
 
-      setNewEducation("")
+      educationForm.reset()
       setIsAddingEducation(false)
       toast.success("Education added successfully")
     } catch (error) {
@@ -247,21 +289,21 @@ export default function Onboarding() {
   }
 
   // Handle add experience
-  const handleAddExperience = async () => {
-    if (!newExperience.trim() || !user) return
+  const handleAddExperience = async (values: z.infer<typeof experienceSchema>) => {
+    if (!user) return
 
     try {
       const userRef = doc(db, "users", user.uid)
       await updateDoc(userRef, {
-        experience: arrayUnion(newExperience),
+        experience: arrayUnion(values.experience),
       })
 
       setUserData((prev) => ({
         ...prev,
-        experience: [...prev.experience, newExperience],
+        experience: [...prev.experience, values.experience],
       }))
 
-      setNewExperience("")
+      experienceForm.reset()
       setIsAddingExperience(false)
       toast.success("Experience added successfully")
     } catch (error) {
@@ -293,41 +335,59 @@ export default function Onboarding() {
   }
 
   // Handle bio and personal info updates
-  const handleUpdateProfile = async () => {
+  const handleUpdateProfile = async (values: z.infer<typeof personalInfoSchema>) => {
     if (!user) return
 
     try {
       const userRef = doc(db, "users", user.uid)
       await updateDoc(userRef, {
-        username: userData.username,
-        bio: userData.bio,
-        phone: userData.phone,
-        profileIcon: userData.profileIcon,
-        isPrivate: userData.isPrivate,
+        username: values.username,
+        bio: values.bio || "",
+        phone: values.phone || "",
+        isPrivate: values.isPrivate,
       })
 
+      setUserData((prev) => ({
+        ...prev,
+        username: values.username,
+        bio: values.bio || "",
+        phone: values.phone || "",
+        isPrivate: values.isPrivate,
+      }))
+
       toast.success("Profile updated successfully")
+      return true
     } catch (error) {
       console.error("Error updating profile:", error)
       toast.error("Failed to update profile")
+      return false
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target
-
-    setUserData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
-    }))
-  }
-
   const handleFinish = async () => {
-    await handleUpdateProfile()
-    router.push("/dashboard")
+    const isValid = await personalInfoForm.trigger()
+    if (!isValid) {
+      toast.error("Please complete all required fields")
+      setCurrentStep(1)
+      return
+    }
+
+    const values = personalInfoForm.getValues()
+    const success = await handleUpdateProfile(values)
+    if (success) {
+      router.push("/")
+    }
   }
 
-  const nextStep = () => {
+  const nextStep = async () => {
+    if (currentStep === 1) {
+      const isValid = await personalInfoForm.trigger()
+      if (!isValid) return
+
+      const values = personalInfoForm.getValues()
+      await handleUpdateProfile(values)
+    }
+
     if (currentStep < 4) {
       setCurrentStep(currentStep + 1)
     }
@@ -342,45 +402,35 @@ export default function Onboarding() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-[350px]">
-          <CardHeader>
-            <CardTitle className="text-center">Loading...</CardTitle>
-            <CardDescription className="text-center">Setting up your profile</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Progress value={75} className="w-full" />
-          </CardContent>
-        </Card>
+        <AnimatedLogo />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-3xl mx-auto px-4">
+    <div className="min-h-screen bg-gray-50 py-6 md:py-12 px-4">
+      <div className="max-w-3xl mx-auto">
         <Card className="border-none shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-center">Complete Your Profile</CardTitle>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl md:text-2xl font-bold text-center">Complete Your Profile</CardTitle>
             <CardDescription className="text-center">Let's set up your profile to help you get started</CardDescription>
           </CardHeader>
           <CardContent>
             {/* Progress indicator */}
-            <div className="mb-8">
+            <div className="mb-6 md:mb-8">
               <div className="flex items-center justify-between mb-2">
                 {[1, 2, 3, 4].map((step) => (
                   <div
                     key={step}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${
+                    className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center border-2 transition-colors ${
                       currentStep >= step ? "bg-green-600 border-green-600 text-white" : "border-gray-300 text-gray-400"
                     }`}
                   >
-                    {currentStep > step ? <Check className="h-5 w-5" /> : step}
+                    {currentStep > step ? <Check className="h-4 w-4 md:h-5 md:w-5" /> : step}
                   </div>
                 ))}
               </div>
-              <Progress value={(currentStep - 1) * 33.33} className="h-2 mb-2 bg-green-600" />
-
-
+              <Progress value={(currentStep - 1) * 33.33} className="h-2 mb-2 [&>div]:bg-green-600" />
               <div className="flex justify-between text-xs text-gray-500">
                 <span>Personal Info</span>
                 <span>Resume</span>
@@ -390,293 +440,307 @@ export default function Onboarding() {
             </div>
 
             {/* Step 1: Personal Information */}
-            {currentStep === 1 && (
-              <div className="space-y-6">
-                <div>
-                  <Label htmlFor="username" className="text-base">
-                    Full Name
-                  </Label>
-                  <Input
-                    id="username"
+            <FormStep title="Personal Information" icon={<User className="h-5 w-5" />} isActive={currentStep === 1}>
+              <Form {...personalInfoForm}>
+                <form className="space-y-4">
+                  <FormField
+                    control={personalInfoForm.control}
                     name="username"
-                    value={userData.username}
-                    onChange={handleInputChange}
-                    className="mt-1"
-                    placeholder="Enter your full name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter your full name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
 
-                <div>
-                  <Label htmlFor="phone" className="text-base">
-                    Phone Number
-                  </Label>
-                  <Input
-                    id="phone"
+                  <FormField
+                    control={personalInfoForm.control}
                     name="phone"
-                    value={userData.phone}
-                    onChange={handleInputChange}
-                    className="mt-1"
-                    placeholder="Enter your phone number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter your phone number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
 
-                <div>
-                  <Label htmlFor="bio" className="text-base">
-                    Bio
-                  </Label>
-                  <Textarea
-                    id="bio"
+                  <FormField
+                    control={personalInfoForm.control}
                     name="bio"
-                    value={userData.bio}
-                    onChange={handleInputChange}
-                    className="mt-1"
-                    placeholder="Tell us about yourself"
-                    rows={4}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bio</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="Tell us about yourself" className="resize-none" rows={4} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
 
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="isPrivate"
-                    checked={userData.isPrivate}
-                    onCheckedChange={(checked) => setUserData((prev) => ({ ...prev, isPrivate: checked }))}
+                  <FormField
+                    control={personalInfoForm.control}
+                    name="isPrivate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel>Private Profile</FormLabel>
+                          <FormDescription>Make your profile private to other users</FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
                   />
-                  <Label htmlFor="isPrivate">Make my profile private</Label>
-                </div>
-              </div>
-            )}
+                </form>
+              </Form>
+            </FormStep>
 
             {/* Step 2: Resume Upload */}
-            {currentStep === 2 && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium mb-4">Upload Your Resume</h3>
+            <FormStep
+              title="Upload Your Resume"
+              description="Share your professional experience with potential employers"
+              icon={<FileText className="h-5 w-5" />}
+              isActive={currentStep === 2}
+            >
+              <div className="space-y-4">
+                {previewUrl && userData.resume_id ? (
+                  <div className="border border-border rounded-lg bg-background">
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-medium">Your Resume</h3>
+                        <Button
+                          onClick={handleDeleteResume}
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive"
+                          aria-label="Remove file"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </Button>
+                      </div>
 
-                  {previewUrl ? (
-                    <Card className="border border-gray-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <FileText className="h-8 w-8 text-red-500" />
-                            <span>Your Resume.pdf</span>
-                          </div>
-                          <div className="flex space-x-2">
-                            <Button variant="outline" size="sm" asChild>
-                              <a href={previewUrl} target="_blank" rel="noopener noreferrer">
-                                View
-                              </a>
-                            </Button>
-                            <Button variant="destructive" size="sm" onClick={handleDeleteResume}>
-                              <Trash2 className="h-4 w-4 mr-1" />
-                              Delete
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
-                      <input
-                        type="file"
-                        id="resume"
-                        accept="application/pdf"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-
-                      {selectedFile ? (
-                        <div className="my-3">
-                          <p className="text-sm text-gray-600 mb-3">Selected file: {selectedFile.name}</p>
-                          <Button
-                            onClick={handleUpload}
-                            disabled={uploading}
-                            className="bg-green-600 hover:bg-green-700"
+                      <div className="flex flex-col items-center justify-center rounded-md bg-muted p-6">
+                        <FileText className="mb-3 h-16 w-16 text-green-600" />
+                        <p className="text-center font-medium mb-1">{resumeFileName || "Resume"}</p>
+                        <p className="text-sm text-muted-foreground mb-4 text-center">
+                          Click the button below to view your resume in a new window
+                        </p>
+                        <Button variant="default" size="lg" className="bg-green-600 hover:bg-green-700" asChild>
+                          <a
+                            href={previewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2"
                           >
-                            <Upload className="h-4 w-4 mr-2" />
-                            {uploading ? "Uploading..." : "Upload Resume"}
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <FileText className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                          <p className="text-sm text-gray-600 mb-4">Drag and drop your resume or click to browse</p>
-                          <Label
-                            htmlFor="resume"
-                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md cursor-pointer inline-block"
-                          >
-                            Select PDF
-                          </Label>
-                        </>
-                      )}
+                            <FileText className="h-4 w-4" />
+                            View Resume
+                          </a>
+                        </Button>
+                      </div>
                     </div>
-                  )}
+                  </div>
+                ) : (
+                  <>
+                    <FileUpload
+                      onFileChange={setSelectedFile}
+                      acceptedFileTypes={{ "application/pdf": [".pdf"] }}
+                      maxSize={5 * 1024 * 1024} // 5MB
+                      label="Upload Resume"
+                      description="Drag & drop your resume here or click to upload"
+                    />
 
-                  <p className="text-sm text-gray-500 italic mt-3">
-                    Please upload your resume in PDF format only. Maximum file size: 5MB.
-                  </p>
-                </div>
+                    {selectedFile && (
+                      <Button
+                        onClick={handleUpload}
+                        disabled={uploading}
+                        className="bg-green-600 hover:bg-green-700 w-full md:w-auto"
+                      >
+                        {uploading ? "Uploading..." : "Upload Resume"}
+                      </Button>
+                    )}
+                  </>
+                )}
+
+                <p className="text-sm text-muted-foreground">
+                  Please upload your resume in PDF format only. Maximum file size: 5MB.
+                </p>
               </div>
-            )}
+            </FormStep>
 
             {/* Step 3: Education */}
-            {currentStep === 3 && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium mb-4">Your Education</h3>
-
-                  {userData.education.length > 0 ? (
-                    <div className="space-y-3">
-                      {userData.education.map((edu, index) => (
-                        <Card key={index} className="bg-gray-50 border border-gray-200">
-                          <CardContent className="p-4 flex items-center justify-between">
-                            <span className="text-sm">{edu}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteEducation(edu)}
-                              className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 h-8 w-8"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <Card className="bg-gray-50 border border-gray-200">
-                      <CardContent className="p-6 text-center">
-                        <p className="text-gray-500 italic">No education entries added yet.</p>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {isAddingEducation ? (
-                    <div className="mt-4 space-y-3">
-                      <Textarea
-                        value={newEducation}
-                        onChange={(e) => setNewEducation(e.target.value)}
-                        placeholder="Example: Bachelor of Science in Computer Science, Stanford University, 2018-2022"
-                        className="w-full"
-                        rows={3}
+            <FormStep title="Your Education" icon={<GraduationCap className="h-5 w-5" />} isActive={currentStep === 3}>
+              <div className="space-y-4">
+                {userData.education.length > 0 ? (
+                  <div className="space-y-3">
+                    {userData.education.map((edu, index) => (
+                      <ListItem
+                        key={index}
+                        content={edu}
+                        onDelete={() => handleDeleteEducation(edu)}
+                        icon={<GraduationCap className="h-4 w-4" />}
                       />
-                      <div className="flex space-x-2">
-                        <Button onClick={handleAddEducation} className="bg-green-600 hover:bg-green-700">
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="bg-gray-50 border border-gray-200">
+                    <CardContent className="p-6 text-center">
+                      <p className="text-muted-foreground">No education entries added yet.</p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {isAddingEducation ? (
+                  <Form {...educationForm}>
+                    <form onSubmit={educationForm.handleSubmit(handleAddEducation)} className="space-y-4">
+                      <FormField
+                        control={educationForm.control}
+                        name="education"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Education Details</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Example: Bachelor of Science in Computer Science, Stanford University, 2018-2022"
+                                className="resize-none"
+                                rows={3}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button type="submit" className="bg-green-600 hover:bg-green-700">
                           Save
                         </Button>
                         <Button
+                          type="button"
                           variant="outline"
                           onClick={() => {
                             setIsAddingEducation(false)
-                            setNewEducation("")
+                            educationForm.reset()
                           }}
                         >
                           Cancel
                         </Button>
                       </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsAddingEducation(true)}
-                      className="mt-4 text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Education
-                    </Button>
-                  )}
-                </div>
+                    </form>
+                  </Form>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsAddingEducation(true)}
+                    className="w-full text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Education
+                  </Button>
+                )}
               </div>
-            )}
+            </FormStep>
 
             {/* Step 4: Experience */}
-            {currentStep === 4 && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium mb-4">Your Experience</h3>
-
-                  {userData.experience.length > 0 ? (
-                    <div className="space-y-3">
-                      {userData.experience.map((exp, index) => (
-                        <Card key={index} className="bg-gray-50 border border-gray-200">
-                          <CardContent className="p-4 flex items-center justify-between">
-                            <span className="text-sm">{exp}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteExperience(exp)}
-                              className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 h-8 w-8"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <Card className="bg-gray-50 border border-gray-200">
-                      <CardContent className="p-6 text-center">
-                        <p className="text-gray-500 italic">No experience entries added yet.</p>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {isAddingExperience ? (
-                    <div className="mt-4 space-y-3">
-                      <Textarea
-                        value={newExperience}
-                        onChange={(e) => setNewExperience(e.target.value)}
-                        placeholder="Example: Software Engineer, Google, Jan 2020 - Present. Developed and maintained scalable web applications."
-                        className="w-full"
-                        rows={3}
+            <FormStep title="Your Experience" icon={<Briefcase className="h-5 w-5" />} isActive={currentStep === 4}>
+              <div className="space-y-4">
+                {userData.experience.length > 0 ? (
+                  <div className="space-y-3">
+                    {userData.experience.map((exp, index) => (
+                      <ListItem
+                        key={index}
+                        content={exp}
+                        onDelete={() => handleDeleteExperience(exp)}
+                        icon={<Briefcase className="h-4 w-4" />}
                       />
-                      <div className="flex space-x-2">
-                        <Button onClick={handleAddExperience} className="bg-green-600 hover:bg-green-700">
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="bg-gray-50 border border-gray-200">
+                    <CardContent className="p-6 text-center">
+                      <p className="text-muted-foreground">No experience entries added yet.</p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {isAddingExperience ? (
+                  <Form {...experienceForm}>
+                    <form onSubmit={experienceForm.handleSubmit(handleAddExperience)} className="space-y-4">
+                      <FormField
+                        control={experienceForm.control}
+                        name="experience"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Experience Details</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Example: Software Engineer, Google, Jan 2020 - Present. Developed and maintained scalable web applications."
+                                className="resize-none"
+                                rows={3}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button type="submit" className="bg-green-600 hover:bg-green-700">
                           Save
                         </Button>
                         <Button
+                          type="button"
                           variant="outline"
                           onClick={() => {
                             setIsAddingExperience(false)
-                            setNewExperience("")
+                            experienceForm.reset()
                           }}
                         >
                           Cancel
                         </Button>
                       </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsAddingExperience(true)}
-                      className="mt-4 text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Experience
-                    </Button>
-                  )}
-                </div>
+                    </form>
+                  </Form>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsAddingExperience(true)}
+                    className="w-full text-green-600 border-green-600 hover:bg-green-50 hover:text-green-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Experience
+                  </Button>
+                )}
               </div>
-            )}
+            </FormStep>
           </CardContent>
-          <CardFooter className="flex justify-between border-t p-6">
+          <CardFooter className="flex justify-between border-t p-6 flex-col sm:flex-row gap-2">
             {currentStep > 1 ? (
-              <Button variant="outline" onClick={prevStep}>
+              <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 Previous
               </Button>
             ) : (
-              <div></div>
+              <div className="hidden sm:block"></div>
             )}
 
             {currentStep < 4 ? (
-              <Button onClick={nextStep} className="bg-green-600 hover:bg-green-700">
+              <Button onClick={nextStep} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">
                 Next
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
-              <Button onClick={handleFinish} className="bg-green-600 hover:bg-green-700">
+              <Button onClick={handleFinish} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">
                 Complete Profile
                 <Check className="h-4 w-4 ml-2" />
               </Button>
