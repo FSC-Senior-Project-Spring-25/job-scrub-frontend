@@ -35,7 +35,7 @@ export default function ResumeSection({ resumeId, isOwnProfile, uid }: ResumeSec
     setLoading(true)
     try {
       const token = await user.getIdToken()
-      const response = await fetch(`/api/resume/view?key=${encodeURIComponent(id)}&uid=${encodeURIComponent(uid)}`, {
+      const response = await fetch(`/api/resume/view?key=${encodeURIComponent(id)}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
 

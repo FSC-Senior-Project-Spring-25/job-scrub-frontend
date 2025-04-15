@@ -77,18 +77,23 @@ export default function ProfilePage() {
     );
   }
 
-  // Determine what data to show based on privacy settings
-  const displayData =
-    userData.isPrivate && !isOwnProfile
-      ? {
-          ...userData,
-          email: "Private",
-          phone: "Private",
-          bio: userData.bio || "This profile is private",
-          education: [],
-          experience: [],
-        }
-      : userData;
+// Determine what data to show based on privacy settings
+const displayData =
+  userData.isPrivate && !isOwnProfile
+    ? {
+        ...userData,
+        email: "Private",
+        phone: "Private",
+        bio: "This profile is private",
+        education: [],
+        experience: [],
+        resume_id: null,
+        // Keep only essential fields visible
+        username: userData.username,
+        profileIcon: userData.profileIcon,
+        isPrivate: true,
+      }
+    : userData;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
