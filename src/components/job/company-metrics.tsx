@@ -20,7 +20,7 @@ export default function CompanyMetrics({ companyName }: Props) {
     totalApplicants: number;
   } | null>(null);
 
-  //Fetch logo from logo.dev using real domain from Clearbit
+  // Fetch company logo from Clearbit
   useEffect(() => {
     const fetchLogo = async () => {
       try {
@@ -48,7 +48,7 @@ export default function CompanyMetrics({ companyName }: Props) {
     fetchLogo();
   }, [companyName]);
 
-  //Load company metrics from Firestore
+  // Fetch metrics from Firestore
   useEffect(() => {
     const loadMetrics = async () => {
       const companyId = companyName.toLowerCase().replace(/[^\w]/g, "");
@@ -57,9 +57,9 @@ export default function CompanyMetrics({ companyName }: Props) {
 
       if (snap.exists()) {
         const data = snap.data();
-        const accepted = data.accepted || 0;
-        const ghosted = data.no_response || 0;
-        const rejected = data.rejected || 0;
+        const accepted = Math.max(0, data.accepted || 0);
+        const ghosted = Math.max(0, data.no_response || 0);
+        const rejected = Math.max(0, data.rejected || 0);
         const total = accepted + ghosted + rejected;
 
         setMetrics({
@@ -95,20 +95,24 @@ export default function CompanyMetrics({ companyName }: Props) {
       </div>
 
       <div className="text-sm text-gray-700 space-y-1">
-        <p><strong>Acceptance Rate:</strong>{" "}
-          {metrics ? formatRate(metrics.accepted, metrics.totalApplicants) : "—%"}</p>
-
-        <p><strong>Ghosting Reports:</strong>{" "}
-          {metrics ? formatRate(metrics.ghosted, metrics.totalApplicants) : "—%"}</p>
-
-        <p><strong>Rejection Rate:</strong>{" "}
-          {metrics ? formatRate(metrics.rejected, metrics.totalApplicants) : "—%"}</p>
-
-        <p><strong>Total Applicants:</strong>{" "}
-          {metrics?.totalApplicants ?? "—"}</p>
-
+        <p>
+          <strong>Acceptance Rate:</strong>{" "}
+          {metrics ? formatRate(metrics.accepted, metrics.totalApplicants) : "—%"}
+        </p>
+        <p>
+          <strong>Ghosting Reports:</strong>{" "}
+          {metrics ? formatRate(metrics.ghosted, metrics.totalApplicants) : "—%"}
+        </p>
+        <p>
+          <strong>Rejection Rate:</strong>{" "}
+          {metrics ? formatRate(metrics.rejected, metrics.totalApplicants) : "—%"}
+        </p>
+        <p>
+          <strong>Total Applicants:</strong>{" "}
+          {metrics?.totalApplicants ?? "—"}
+        </p>
         <p className="text-xs text-gray-400 mt-2">
-          *Community-reported company reputation
+          *Metrics provided by the communit
         </p>
       </div>
     </div>
