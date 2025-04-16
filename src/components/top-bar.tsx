@@ -14,6 +14,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/auth-context";
 import { toast } from "sonner";
+import UserSearch from "@/components/UserSearch";
 
 interface NavItem {
   href: string;
@@ -120,6 +121,9 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                 </Link>
               ))}
             </div>
+          </div>
+          <div className="hidden lg:block w-64 mx-4">
+            <UserSearch />
           </div>
 
           {/* User Actions */}
