@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation"
 interface Comment {
   id: string
   author: string
+  author_uid: string
   text: string
   created_at: string
 }
@@ -212,6 +213,7 @@ export default function ConnectFeed() {
       const newComment = {
         id: "temp-" + Date.now(),
         author: user.email || "Anonymous",
+        author_uid: user.uid || "Anonymous",
         text: commentText,
         created_at: new Date().toISOString(),
       }
@@ -341,7 +343,7 @@ export default function ConnectFeed() {
                           <div className="flex justify-between">
                             <p
                               className="text-sm font-medium cursor-pointer hover:text-blue-500 transition-colors"
-                              onClick={() => navigateToProfile(comment.author)}
+                              onClick={() => navigateToProfile(comment.author_uid)}
                             >
                               {comment.author}
                             </p>
