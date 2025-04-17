@@ -26,7 +26,7 @@ interface ChatResponse {
   selected_agent: string
 }
 
-export default function ResumeEnhancer() {
+export default function ScrubbyChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -75,18 +75,21 @@ export default function ResumeEnhancer() {
       },
     ])
 
-    // Split the response into chunks (words)
-    const words = fullResponse.split(" ")
+    // Split the response into chunks (sentences or partial sentences)
+    // This preserves markdown structure better than splitting by words
+    const chunks = fullResponse.match(/[^.!?]+[.!?]|\S+/g) || []
     let currentIndex = 0
+    let accumulatedContent = ""
 
     // Function to add the next chunk
     const addNextChunk = () => {
-      if (currentIndex < words.length) {
-        // Add 1-3 words at a time to simulate natural chunking
-        const chunkSize = Math.floor(Math.random() * 3) + 1
-        const chunk = words.slice(currentIndex, currentIndex + chunkSize).join(" ")
+      if (currentIndex < chunks.length) {
+        // Add 1-2 chunks at a time
+        const chunkSize = Math.floor(Math.random() * 2) + 1
+        const chunk = chunks.slice(currentIndex, currentIndex + chunkSize).join(" ")
 
-        setStreamedResponse((prev) => prev + (prev ? " " : "") + chunk)
+        accumulatedContent += (accumulatedContent ? " " : "") + chunk
+        setStreamedResponse(accumulatedContent)
         currentIndex += chunkSize
 
         // Update the loading message with current streamed content
@@ -96,17 +99,14 @@ export default function ResumeEnhancer() {
           if (loadingMessageIndex !== -1) {
             newMessages[loadingMessageIndex] = {
               ...newMessages[loadingMessageIndex],
-              content:
-                newMessages[loadingMessageIndex].content +
-                (newMessages[loadingMessageIndex].content ? " " : "") +
-                chunk,
+              content: accumulatedContent,
             }
           }
           return newMessages
         })
 
-        // Random delay between 50-150ms for natural typing feel
-        const delay = Math.floor(Math.random() * 100) + 50
+        // Slower delay between 200-400ms for a more gradual typing feel
+        const delay = Math.floor(Math.random() * 200) + 200
         setTimeout(addNextChunk, delay)
       } else {
         // Streaming complete
@@ -394,13 +394,13 @@ export default function ResumeEnhancer() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-green-200 to-green-100">
+    <div className="flex flex-col h-screen bg-white">
       <div className="flex-1 overflow-hidden max-w-3xl w-full mx-auto flex flex-col p-4 gap-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-green-200 w-full text-center">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-green-100 w-full text-center">
               <div className="flex justify-center mb-3">
-                <div className="bg-green-100 p-3 rounded-full">
+                <div className="bg-green-50 p-3 rounded-full">
                   <Sparkles className="h-6 w-6 text-green-600" />
                 </div>
               </div>
@@ -423,7 +423,7 @@ export default function ResumeEnhancer() {
             <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
                 className={`max-w-[85%] rounded-xl p-3 ${
-                  message.role === "user" ? "bg-green-600 text-white" : "bg-white border border-green-200 shadow-sm"
+                  message.role === "user" ? "bg-green-700 text-white" : "bg-white border border-green-100 shadow-sm"
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
@@ -489,14 +489,14 @@ export default function ResumeEnhancer() {
         </div>
 
         {suggestions.length > 0 && (
-          <div className="bg-white p-3 rounded-lg border border-green-200">
+          <div className="bg-white p-3 rounded-lg border border-green-100">
             <h3 className="text-xs font-medium text-green-700 mb-2">Try asking:</h3>
             <div className="flex flex-wrap gap-2">
               {suggestions.map((suggestion, i) => (
                 <button
                   key={i}
                   onClick={() => setInput(suggestion)}
-                  className="text-xs bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1 rounded-full"
+                  className="text-xs bg-green-50 hover:bg-green-100 text-green-600 px-3 py-1 rounded-full"
                 >
                   {suggestion}
                 </button>
@@ -526,7 +526,7 @@ export default function ResumeEnhancer() {
 
         <form
           onSubmit={handleSubmit}
-          className="sticky bottom-0 bg-white rounded-xl border border-green-200 shadow-sm p-3"
+          className="sticky bottom-0 bg-white rounded-xl border border-green-100 shadow-sm p-3"
         >
           <Textarea
             value={input}
@@ -534,6 +534,14 @@ export default function ResumeEnhancer() {
             placeholder="Ask for resume improvements, job application tips..."
             className="min-h-[60px] border-0 focus-visible:ring-1 focus-visible:ring-green-300 text-sm"
             disabled={isLoading || isStreaming}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault()
+                if (input.trim() || files.length > 0) {
+                  handleSubmit(e as unknown as FormEvent)
+                }
+              }
+            }}
           />
           <div className="flex justify-between items-center mt-2">
             <div>
