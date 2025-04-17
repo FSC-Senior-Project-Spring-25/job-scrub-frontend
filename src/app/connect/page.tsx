@@ -41,7 +41,6 @@ export default function ConnectFeed() {
   const router = useRouter()
 
   const navigateToProfile = (uid: string) => {
-    // You might want to encode the email or use a different ID depending on your setup
     const encodedId = encodeURIComponent(uid)
     router.push(`/profile/${encodedId}`)
   }

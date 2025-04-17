@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";              // you’ll use this later
+import { useRouter } from "next/navigation";
 import { FaSearch } from "react-icons/fa";
 
 interface UserProfile {
@@ -14,11 +14,12 @@ interface UserProfile {
 }
 
 export default function UserSearch() {
-  const [query, setQuery]         = useState("");
-  const [results, setResults]     = useState<UserProfile[]>([]);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState("");
-  const containerRef              = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   /** close dropdown if click outside */
   useEffect(() => {
@@ -41,7 +42,7 @@ export default function UserSearch() {
       try {
         setLoading(true);
         const base = process.env.NEXT_PUBLIC_API_BASE_URL;
-        const res  = await fetch(
+        const res = await fetch(
           `http://localhost:8000/users/search?q=${encodeURIComponent(query)}`
         );
         if (!res.ok) throw new Error(`API ${res.status}`);
@@ -93,9 +94,7 @@ export default function UserSearch() {
                 <span className="text-xl mr-2">{user.profileIcon}</span>
               )}
               <div className="text-sm leading-snug">
-                <div className="font-medium">
-                  {user.username || user.email}
-                </div>
+                <div className="font-medium">{user.username || user.email}</div>
                 <div className="text-gray-500">{user.email}</div>
               </div>
             </li>
