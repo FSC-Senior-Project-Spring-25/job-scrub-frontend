@@ -10,6 +10,7 @@ import {
   FaBriefcase,
   FaRegFileAlt,
   FaUserCircle,
+  FaCheckCircle,
 } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/auth-context";
@@ -32,13 +33,18 @@ const defaultNavItems: NavItem[] = [
     icon: <FaBriefcase className="mr-2" />,
   },
   {
+    href: "/verify",
+    label: "Verify",
+    icon: <FaCheckCircle className="mr-2" />,
+  },
+  {
     href: "/match",
-    label: "Match Resume",
+    label: "Match",
     icon: <FaSearch className="mr-2" />,
   },
   {
-    href: "/enhance",
-    label: "Enhance Resume",
+    href: "/scrubby",
+    label: "Scrubby",
     icon: <FaRegFileAlt className="mr-2" />,
   },
   { href: "/connect", label: "Connect", icon: <FaUser className="mr-2" /> },
