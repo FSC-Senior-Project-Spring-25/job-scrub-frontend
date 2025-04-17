@@ -63,6 +63,7 @@ export default function UserSearch() {
     console.log("Clicked:", user);
     setQuery("");
     setResults([]);
+    router.push(`/profile/${encodeURIComponent(user.id)}`);
   };
 
   return (
