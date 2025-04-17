@@ -106,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // No need to set user here as onAuthStateChanged will handle that
       return { success: true };
     } catch (error: any) {
+      setLoading(false);
       return {
         success: false,
         error: error.message,
