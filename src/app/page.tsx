@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import ApplicationBadge from "@/components/job/application-badge";
+import SavedJobsBadge from '@/components/job/saved-badge';
 import { useEffect, useState } from "react";
 import {
   FaSearch,
@@ -141,19 +143,17 @@ export default function HomePage() {
             <div className="bg-white rounded-lg shadow p-4">
               <h2 className="font-semibold text-lg mb-4">Quick Links</h2>
               <nav className="space-y-2">
-                <Link
-                  href="/jobs"
+              <ApplicationBadge />
+              <SavedJobsBadge />
+                {/*<Link
+                  href="/applications"
                   className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
                 >
                   <FaRegClock className="mr-2" /> My Job Applications
-                </Link>
-                <Link
-                  href="/saved"
-                  className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
-                >
-                  <FaRegBookmark className="mr-2" /> Saved Jobs
-                </Link>
+                </Link>8 
+                */}
               </nav>
+
             </div>
           </div>
 
@@ -280,7 +280,7 @@ export default function HomePage() {
                             Save
                           </button>
                           <Link
-                            href={`/job/${jobId}`}
+                            href={`/jobs/${jobId}`}
                             className="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
                           >
                             View Details

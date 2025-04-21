@@ -41,9 +41,9 @@ export default function Signup() {
         createdAt: new Date(),
         isAdmin: false
       });
-
-      // redirecting to login page after successful signup
-      router.push('/login'); 
+      
+      // Redirect to onboarding page after successful signup
+      router.push('/onboarding');
 
       console.log('just after the login line');
     } catch (err:any) {

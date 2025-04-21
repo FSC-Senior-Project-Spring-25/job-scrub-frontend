@@ -15,9 +15,9 @@ export async function middleware(request: NextRequest) {
   // Allow public paths and static files
   if (isPublicPath || request.nextUrl.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
     // If user is logged in and tries to access login/signup, redirect to home
-    if (sessionCookie && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
+    // if (sessionCookie && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
+    //   return NextResponse.redirect(new URL('/', request.url));
+    // }
     return NextResponse.next();
   }
 
@@ -31,15 +31,26 @@ export async function middleware(request: NextRequest) {
 
   try {
     // Verify session with FastAPI through Next.js API route
-    const apiUrl = request.nextUrl.origin + '/api/auth/verify';
+    const apiUrl = new URL('/api/auth/verify', request.url).toString();
+    
+    // Add debugging
+    console.log(`[middleware] Verifying session at ${apiUrl}`);
+    
     const verifyResponse = await fetch(apiUrl, {
       headers: {
         Cookie: `session=${sessionCookie}`,
-        'x-middleware-prefetch': '1'
-      }
+      },
+      cache: 'no-store', // Prevent caching issues
     });
 
-    if (!verifyResponse.ok) {
+    // Add response status debugging
+    console.log(`[middleware] Verification response status: ${verifyResponse.status}`);
+    
+    const responseData = await verifyResponse.json();
+    console.log(`[middleware] Verification response:`, responseData);
+
+    if (!verifyResponse.ok || !responseData.valid) {
+      console.error('[middleware] Session verification failed:', responseData);
       // Invalid session - clear cookie and redirect to login
       const response = NextResponse.redirect(new URL('/login', request.url));
       response.cookies.delete('session');
@@ -49,12 +60,12 @@ export async function middleware(request: NextRequest) {
     // Session is valid - allow request
     const response = NextResponse.next();
     
-    // Ensure the session cookie is properly forwarded
-    response.headers.set('Cookie', `session=${sessionCookie}`);
+    // Don't attempt to set Cookie header here as it's not the correct approach
+    // The session cookie is already in the browser and will be sent with subsequent requests
     
     return response;
   } catch (error) {
-    console.error('Middleware error:', error);
+    console.error('[middleware] Verification error:', error);
     // On error, redirect to login
     const response = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete('session');

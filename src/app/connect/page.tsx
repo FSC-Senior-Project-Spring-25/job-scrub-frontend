@@ -1,112 +1,118 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Heart, MessageSquare, Plus, Send } from "lucide-react";
-import { format } from "date-fns";
-import { useAuth } from "../auth-context";
-import { toast } from "sonner";
-import AnimatedLogo from "@/components/animated-logo";
+import { useEffect, useState } from "react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Heart, MessageSquare, Plus, Send } from "lucide-react"
+import { format } from "date-fns"
+import { useAuth } from "../auth-context"
+import { toast } from "sonner"
+import AnimatedLogo from "@/components/animated-logo"
+import ChatPopup from "@/components/messages/chat-popup"
+import { useRouter } from "next/navigation"
 
 interface Comment {
-  id: string;
-  author: string;
-  text: string;
-  created_at: string;
+  id: string
+  author: string
+  author_uid: string
+  text: string
+  created_at: string
 }
 
 interface Post {
-  id: string;
-  author: string;
-  content: string;
-  created_at: string;
-  likes: number;
-  comments: Comment[];
-  userHasLiked?: boolean;
+  id: string
+  author: string
+  author_uid: string
+  content: string
+  created_at: string
+  likes: number
+  comments: Comment[]
+  userHasLiked?: boolean
 }
 
 export default function ConnectFeed() {
-  const { user, loading: authLoading } = useAuth();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [newPostContent, setNewPostContent] = useState("");
-  const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>(
-    {}
-  );
-  const [showComments, setShowComments] = useState<{ [key: string]: boolean }>(
-    {}
-  );
+  const { user, loading: authLoading } = useAuth()
+  const [posts, setPosts] = useState<Post[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newPostContent, setNewPostContent] = useState("")
+  const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>({})
+  const [showComments, setShowComments] = useState<{ [key: string]: boolean }>({})
+
+  const router = useRouter()
+
+  const navigateToProfile = (uid: string) => {
+    const encodedId = encodeURIComponent(uid)
+    router.push(`/profile/${encodedId}`)
+  }
 
   // Function to fetch posts
   const fetchPosts = async () => {
     try {
-      const token = await user?.getIdToken();
+      const token = await user?.getIdToken()
       const response = await fetch("/api/posts", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      });
+      })
 
       if (!response.ok) {
-        throw new Error("Failed to fetch posts");
+        throw new Error("Failed to fetch posts")
       }
 
-      const data = await response.json();
-      setPosts(data);
+      const data = await response.json()
+      setPosts(data)
     } catch (error) {
-      console.error("Error fetching posts:", error);
+      console.error("Error fetching posts:", error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   // Initial fetch
   useEffect(() => {
     if (user) {
-      fetchPosts();
+      fetchPosts()
     }
-  }, [user]);
+  }, [user])
 
   // Set up polling every minute
   useEffect(() => {
-    if (!user) return;
+    if (!user) return
 
     const intervalId = setInterval(() => {
-      fetchPosts();
-    }, 60000);
+      fetchPosts()
+    }, 60000)
 
     // Cleanup the interval when component unmounts
-    return () => clearInterval(intervalId);
-  }, [user]);
+    return () => clearInterval(intervalId)
+  }, [user])
 
   async function toggleLike(postId: string) {
-    if (!user) return;
+    if (!user) return
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken()
 
       // Find the current post
-      const currentPost = posts.find((p) => p.id === postId);
-      if (!currentPost) return;
+      const currentPost = posts.find((p) => p.id === postId)
+      if (!currentPost) return
 
       // Optimistically update UI first
       setPosts((currentPosts) =>
         currentPosts.map((post) => {
           if (post.id === postId) {
-            const currentLikes =
-              typeof post.likes === "number" ? post.likes : 0;
-            const hasLiked = post.userHasLiked || false;
+            const currentLikes = typeof post.likes === "number" ? post.likes : 0
+            const hasLiked = post.userHasLiked || false
 
             return {
               ...post,
               likes: hasLiked ? currentLikes - 1 : currentLikes + 1,
               userHasLiked: !hasLiked,
-            };
+            }
           }
-          return post;
-        })
-      );
+          return post
+        }),
+      )
 
       // Then send request to server
       await fetch(`/api/posts/${postId}/like`, {
@@ -115,38 +121,39 @@ export default function ConnectFeed() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-      });
+      })
     } catch (err) {
-      console.error("Error toggling like:", err);
+      console.error("Error toggling like:", err)
       // Revert the optimistic update if there's an error
-      fetchPosts();
+      fetchPosts()
     }
   }
 
   async function handleAddPost() {
     if (!user || !newPostContent.trim()) {
-      return; // Don't post if not logged in or content is empty
+      return // Don't post if not logged in or content is empty
     }
 
-    const tempId = `temp-${Date.now()}`; // Create a temporary ID
+    const tempId = `temp-${Date.now()}` // Create a temporary ID
     const newPost = {
       id: tempId,
       author: user.email || "Anonymous",
+      author_uid: user.uid || "Anonymous",
       content: newPostContent,
       created_at: new Date().toISOString(),
       likes: 0,
       comments: [],
       userHasLiked: false,
-    };
+    }
 
     // Optimistically update UI first
-    setPosts((currentPosts) => [newPost, ...currentPosts]);
+    setPosts((currentPosts) => [newPost, ...currentPosts])
 
     // Clear the textarea immediately for better UX
-    setNewPostContent("");
+    setNewPostContent("")
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken()
 
       const response = await fetch("/api/posts", {
         method: "POST",
@@ -159,27 +166,23 @@ export default function ConnectFeed() {
           content: newPost.content,
           created_at: newPost.created_at,
         }),
-      });
+      })
 
       if (!response.ok) {
         // If the request fails, remove the temporary post
-        setPosts((currentPosts) =>
-          currentPosts.filter((post) => post.id !== tempId)
-        );
-        throw new Error("Failed to create post");
+        setPosts((currentPosts) => currentPosts.filter((post) => post.id !== tempId))
+        throw new Error("Failed to create post")
       }
 
-      const result = await response.json();
-      console.log("Post created:", result);
+      const result = await response.json()
+      console.log("Post created:", result)
 
       // Update the temporary post with the real server data
       // This makes sure our local state matches the server state
-      setPosts((currentPosts) =>
-        currentPosts.map((post) => (post.id === tempId ? { ...result } : post))
-      );
+      setPosts((currentPosts) => currentPosts.map((post) => (post.id === tempId ? { ...result } : post)))
     } catch (error) {
-      console.error("Error creating post:", error);
-      toast.error("Failed to create post. Please try again.");
+      console.error("Error creating post:", error)
+      toast.error("Failed to create post. Please try again.")
     }
   }
 
@@ -187,42 +190,39 @@ export default function ConnectFeed() {
     setShowComments((prev) => ({
       ...prev,
       [postId]: !prev[postId],
-    }));
-  };
+    }))
+  }
 
   const handleCommentInputChange = (postId: string, value: string) => {
     setCommentInputs((prev) => ({
       ...prev,
       [postId]: value,
-    }));
-  };
+    }))
+  }
 
   async function submitComment(postId: string) {
-    if (!user) return;
-    const commentText = commentInputs[postId]?.trim();
-    if (!commentText) return;
+    if (!user) return
+    const commentText = commentInputs[postId]?.trim()
+    if (!commentText) return
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken()
 
       // Optimistically update UI
       const newComment = {
         id: "temp-" + Date.now(),
         author: user.email || "Anonymous",
+        author_uid: user.uid || "Anonymous",
         text: commentText,
         created_at: new Date().toISOString(),
-      };
+      }
 
       setPosts((prevPosts) =>
-        prevPosts.map((post) =>
-          post.id === postId
-            ? { ...post, comments: [newComment, ...post.comments] }
-            : post
-        )
-      );
+        prevPosts.map((post) => (post.id === postId ? { ...post, comments: [newComment, ...post.comments] } : post)),
+      )
 
       // Clear the input
-      setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
+      setCommentInputs((prev) => ({ ...prev, [postId]: "" }))
 
       // Send request to server
       await fetch(`/api/posts/${postId}/comment`, {
@@ -232,14 +232,14 @@ export default function ConnectFeed() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      });
+      })
 
       // Fetch updated data to ensure consistency
-      fetchPosts();
+      fetchPosts()
     } catch (error) {
-      console.error("Error adding comment:", error);
+      console.error("Error adding comment:", error)
       // Revert optimistic update on error
-      fetchPosts();
+      fetchPosts()
     }
   }
 
@@ -248,7 +248,7 @@ export default function ConnectFeed() {
       <div className="flex items-center justify-center min-h-[70vh]">
         <AnimatedLogo />
       </div>
-    );
+    )
   }
 
   return (
@@ -257,19 +257,12 @@ export default function ConnectFeed() {
       <div className="w-full md:w-1/4 bg-white shadow-md rounded-lg p-4 mb-4 md:mb-0">
         <div className="flex flex-col items-center">
           <div className="w-20 h-20 bg-gray-300 rounded-full mb-3"></div>
-          <p className="font-semibold">
-            {user.displayName || user.email || "User"}
-          </p>
+          <p className="font-semibold">{user.displayName || user.email || "User"}</p>
           <p className="text-sm text-gray-500">
-            Member since:{" "}
-            {format(
-              new Date(user.metadata?.creationTime || Date.now()),
-              "yyyy"
-            )}
+            Member since: {format(new Date(user.metadata?.creationTime || Date.now()), "yyyy")}
           </p>
         </div>
       </div>
-
       {/* Main Feed */}
       <div className="w-full md:w-3/4">
         <div className="bg-white p-4 rounded-lg shadow-md mb-4">
@@ -294,43 +287,30 @@ export default function ConnectFeed() {
         {loading ? (
           <p>Loading posts...</p>
         ) : posts.length === 0 ? (
-          <p className="text-center text-gray-500 py-8">
-            No posts yet. Be the first to share something!
-          </p>
+          <p className="text-center text-gray-500 py-8">No posts yet. Be the first to share something!</p>
         ) : (
           posts.map((post) => (
             <Card key={post.id} className="mb-4">
               <CardContent className="p-4">
-                <p className="font-semibold">{post.author}</p>
-                <p className="text-gray-700 mt-2 whitespace-pre-wrap">
-                  {post.content}
+                <p
+                  className="font-semibold cursor-pointer hover:text-blue-500 transition-colors"
+                  onClick={() => navigateToProfile(post.author_uid)}
+                >
+                  {post.author}
                 </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  {format(new Date(post.created_at), "PPP")}
-                </p>
+                <p className="text-gray-700 mt-2 whitespace-pre-wrap">{post.content}</p>
+                <p className="text-sm text-gray-500 mt-2">{format(new Date(post.created_at), "PPP")}</p>
                 <div className="flex items-center gap-4 mt-3">
                   <Button
                     variant={post.userHasLiked ? "default" : "ghost"}
                     size="sm"
                     onClick={() => toggleLike(post.id)}
-                    className={
-                      post.userHasLiked
-                        ? "bg-pink-100 text-pink-500 hover:bg-pink-200"
-                        : ""
-                    }
+                    className={post.userHasLiked ? "bg-pink-100 text-pink-500 hover:bg-pink-200" : ""}
                   >
-                    <Heart
-                      className={`w-4 h-4 mr-1 ${
-                        post.userHasLiked ? "fill-pink-500 text-pink-500" : ""
-                      }`}
-                    />
+                    <Heart className={`w-4 h-4 mr-1 ${post.userHasLiked ? "fill-pink-500 text-pink-500" : ""}`} />
                     {post.likes || 0}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleCommentSection(post.id)}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => toggleCommentSection(post.id)}>
                     <MessageSquare className="w-4 h-4 mr-1" />
                     {post.comments?.length || 0}
                   </Button>
@@ -344,12 +324,8 @@ export default function ConnectFeed() {
                         placeholder="Write a comment..."
                         className="flex-grow p-2 text-sm border rounded"
                         value={commentInputs[post.id] || ""}
-                        onChange={(e) =>
-                          handleCommentInputChange(post.id, e.target.value)
-                        }
-                        onKeyPress={(e) =>
-                          e.key === "Enter" && submitComment(post.id)
-                        }
+                        onChange={(e) => handleCommentInputChange(post.id, e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && submitComment(post.id)}
                       />
                       <Button
                         size="sm"
@@ -362,28 +338,23 @@ export default function ConnectFeed() {
 
                     {post.comments && post.comments.length > 0 ? (
                       post.comments.map((comment, idx) => (
-                        <div
-                          key={comment.id || idx}
-                          className="border-b last:border-0 py-2"
-                        >
+                        <div key={comment.id || idx} className="border-b last:border-0 py-2">
                           <div className="flex justify-between">
-                            <p className="text-sm font-medium">
+                            <p
+                              className="text-sm font-medium cursor-pointer hover:text-blue-500 transition-colors"
+                              onClick={() => navigateToProfile(comment.author_uid)}
+                            >
                               {comment.author}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {format(
-                                new Date(comment.created_at),
-                                "MMM d, h:mm a"
-                              )}
+                              {format(new Date(comment.created_at), "MMM d, h:mm a")}
                             </p>
                           </div>
                           <p className="text-sm mt-1">{comment.text}</p>
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-gray-500">
-                        No comments yet. Be the first to comment!
-                      </p>
+                      <p className="text-sm text-gray-500">No comments yet. Be the first to comment!</p>
                     )}
                   </div>
                 )}
@@ -392,6 +363,7 @@ export default function ConnectFeed() {
           ))
         )}
       </div>
+      <ChatPopup />
     </div>
-  );
+  )
 }

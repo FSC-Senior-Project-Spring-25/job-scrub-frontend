@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const loginResponse = await fetch("/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken }),
+            body: JSON.stringify({ idToken: idToken }),
             credentials: "include", // Important for cookie handling
           });
 
@@ -106,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // No need to set user here as onAuthStateChanged will handle that
       return { success: true };
     } catch (error: any) {
+      setLoading(false);
       return {
         success: false,
         error: error.message,

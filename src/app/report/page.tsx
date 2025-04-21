@@ -35,6 +35,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const locationSchema = z
+  .object({
+    type: z.enum(["remote", "onsite", "hybrid"]),
+    address: z.string().optional(),
+    coordinates: z
+      .object({
+        lat: z.number(),
+        lon: z.number(),
+      })
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.type === "remote") return true;
+      return !!(data.address && data.coordinates);
+    },
+    {
+      message: "Location details required for non-remote positions",
+      path: ["address"],
+    }
+  );
+
 const formSchema = z.object({
   title: z.string().min(1, {
     message: "Job title is required.",
@@ -56,37 +78,12 @@ const formSchema = z.object({
   skills: z.array(z.string()).min(1, {
     message: "At least one skill is required.",
   }),
-  location: z
-    .object({
-      type: z.enum(["remote", "onsite", "hybrid"]),
-      address: z
-        .string()
-        .optional()
-        .refine(
-          (val) => {
-            // Only validate if it's provided and not remote
-            if (!val) return true;
-            return /^[A-Za-z\s\-\.]+(?:[,]\s*[A-Za-z\s\-\.]+)*$/.test(val);
-          },
-          {
-            message:
-              "Please enter a valid location (e.g., 'City, Country' or 'City, State')",
-          }
-        ),
-    })
-    .refine((data) => !(data.type === "hybrid" && !data.address), {
-      message: "Address is required for hybrid positions",
-      path: ["address"],
-    })
-    .refine((data) => !(data.type === "onsite" && !data.address), {
-      message: "Address is required for onsite positions",
-      path: ["address"],
-    }),
-  job_type: z.enum([
+  location: locationSchema,
+  jobType: z.enum([
     "fulltime",
     "parttime",
     "contract",
-    "freelance",
+    "volunteer",
     "internship",
   ]),
 });
@@ -102,11 +99,21 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   };
 }
 
+interface LocationSuggestion {
+  address: string;
+  coordinates: {
+    lat: number;
+    lon: number;
+  };
+}
+
 export default function ReportPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [skillInput, setSkillInput] = useState("");
   const [benefitInput, setBenefitInput] = useState("");
-  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const [locationSuggestions, setLocationSuggestions] = useState<
+    LocationSuggestion[]
+  >([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isValidatingLocation, setIsValidatingLocation] = useState(false);
 
@@ -125,7 +132,7 @@ export default function ReportPage() {
         type: "onsite",
         address: "",
       },
-      job_type: "fulltime",
+      jobType: "fulltime",
     },
   });
 
@@ -133,12 +140,18 @@ export default function ReportPage() {
     // need to format the location field based on the type
     const formattedValues = {
       ...values,
-      location:
-        values.location.type === "remote" ? "Remote" : values.location.address,
+      location: {
+        type: values.location.type,
+        address: values.location.address,
+        coordinates: values.location.coordinates,
+      },
+      locationType: values.location.type,
+      date: format(values.date, "yyyy-MM-dd"),
+      jobType: values.jobType
     };
 
     setIsSubmitting(true);
-    fetch("/api/report", {
+    fetch("/api/job/report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formattedValues),
@@ -218,19 +231,44 @@ export default function ReportPage() {
 
         if (response.ok) {
           const data = await response.json();
-          const suggestions = data
+          const suggestions: LocationSuggestion[] = data
             .map((item: any) => {
-              const city =
-                item.address?.city ||
-                item.address?.town ||
-                item.address?.village ||
-                "";
-              const state = item.address?.state || "";
-              return city && state ? `${city}, ${state}` : "";
+              // Get the most specific location name with fallbacks
+              const locationName = 
+                item.address?.city || 
+                item.address?.town || 
+                item.address?.village;
+        
+              // Skip if no location name found
+              if (!locationName) return null;
+        
+              // For US addresses, use state
+              if (item.address?.country === "United States" && item.address?.state) {
+                return {
+                  address: `${locationName}, ${item.address.state}`,
+                  coordinates: {
+                    lat: parseFloat(item.lat),
+                    lon: parseFloat(item.lon),
+                  }
+                };
+              }
+              
+              // For international addresses, use country
+              if (item.address?.country) {
+                return {
+                  address: `${locationName}, ${item.address.country}`,
+                  coordinates: {
+                    lat: parseFloat(item.lat),
+                    lon: parseFloat(item.lon),
+                  }
+                };
+              }
+        
+              return null;
             })
-            .filter(Boolean);
-
-          setLocationSuggestions([...new Set(suggestions)] as string[]);
+            .filter((item: any): item is LocationSuggestion => item !== null);
+        
+          setLocationSuggestions(suggestions);
         }
       } catch (error) {
         console.error("Error fetching location suggestions:", error);
@@ -240,7 +278,7 @@ export default function ReportPage() {
         }
       }
     }, 300),
-    [] // Empty dependency array since we don't need to recreate this function
+    []
   );
 
   return (
@@ -396,11 +434,18 @@ export default function ReportPage() {
                               key={index}
                               className="p-2 hover:bg-muted cursor-pointer"
                               onClick={() => {
-                                form.setValue("location.address", suggestion);
+                                form.setValue(
+                                  "location.address",
+                                  suggestion.address
+                                );
+                                form.setValue(
+                                  "location.coordinates",
+                                  suggestion.coordinates
+                                );
                                 setShowSuggestions(false);
                               }}
                             >
-                              {suggestion}
+                              {suggestion.address}
                             </div>
                           ))}
                         </div>
@@ -417,7 +462,7 @@ export default function ReportPage() {
               )}
               <FormField
                 control={form.control}
-                name="job_type"
+                name="jobType"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Job Type</FormLabel>

@@ -10,10 +10,12 @@ import {
   FaBriefcase,
   FaRegFileAlt,
   FaUserCircle,
+  FaCheckCircle,
 } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/auth-context";
 import { toast } from "sonner";
+import UserSearch from "@/components/UserSearch";
 
 interface NavItem {
   href: string;
@@ -32,13 +34,18 @@ const defaultNavItems: NavItem[] = [
     icon: <FaBriefcase className="mr-2" />,
   },
   {
+    href: "/verify",
+    label: "Verify",
+    icon: <FaCheckCircle className="mr-2" />,
+  },
+  {
     href: "/match",
-    label: "Match Resume",
+    label: "Match",
     icon: <FaSearch className="mr-2" />,
   },
   {
-    href: "/enhance",
-    label: "Enhance Resume",
+    href: "/scrubby",
+    label: "Scrubby",
     icon: <FaRegFileAlt className="mr-2" />,
   },
   { href: "/connect", label: "Connect", icon: <FaUser className="mr-2" /> },
@@ -47,12 +54,13 @@ const defaultNavItems: NavItem[] = [
 export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const router = useRouter();
 
   // Add refs for dropdown menus
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
+  const profilePath = user ? `/profile/${user.uid}` : "/login";
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const toggleProfileMenu = () => setIsProfileMenuOpen(!isProfileMenuOpen);
@@ -121,10 +129,18 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
               ))}
             </div>
           </div>
+          <div className="hidden lg:block w-64 mx-4">
+            <UserSearch />
+          </div>
 
           {/* User Actions */}
           <div className="flex items-center">
-            {user ? (
+            {loading ? (
+              // Show loading indicator instead of auth UI
+              <div className="flex items-center text-gray-500">
+                <div className="animate-pulse h-8 w-24 bg-gray-200 rounded" />
+              </div>
+            ) : user ? (
               <div className="flex items-center">
                 <div className="hidden lg:block mr-4">
                   <span className="text-sm text-gray-600">
@@ -151,7 +167,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                       className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50"
                     >
                       <Link
-                        href="/profile"
+                        href={profilePath}
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         onClick={() => setIsProfileMenuOpen(false)}
                       >
@@ -180,19 +196,21 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
               </Link>
             )}
 
-            <button
-              onClick={toggleMenu}
-              className="lg:hidden text-gray-700 hover:text-green-600 transition-colors ml-4"
-              aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-            >
-              {isMenuOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
-            </button>
+            {!loading && (
+              <button
+                onClick={toggleMenu}
+                className="lg:hidden text-gray-700 hover:text-green-600 transition-colors ml-4"
+                aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+              >
+                {isMenuOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Mobile menu */}
-      {isMenuOpen && (
+      {isMenuOpen && !loading && (
         <div className="lg:hidden absolute w-full bg-white shadow-lg">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {navItems.map((item) => (
@@ -210,7 +228,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
             {user && (
               <>
                 <Link
-                  href="/profile"
+                  href={profilePath}
                   className="flex items-center text-gray-700 hover:text-green-600 hover:bg-gray-50 transition-colors px-3 py-2 rounded"
                   onClick={toggleMenu}
                 >

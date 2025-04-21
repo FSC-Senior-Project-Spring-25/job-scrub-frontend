@@ -54,6 +54,28 @@ import { Calendar as DateCalendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
+const locationSchema = z
+  .object({
+    type: z.enum(["remote", "onsite", "hybrid"]),
+    address: z.string().optional(),
+    coordinates: z
+      .object({
+        lat: z.number(),
+        lon: z.number(),
+      })
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.type === "remote") return true;
+      return !!(data.address && data.coordinates);
+    },
+    {
+      message: "Location details required for non-remote positions",
+      path: ["address"],
+    }
+  );
+
 const formSchema = z.object({
   title: z.string().min(1, {
     message: "Job title is required.",
@@ -75,37 +97,12 @@ const formSchema = z.object({
   skills: z.array(z.string()).min(1, {
     message: "At least one skill is required.",
   }),
-  location: z
-    .object({
-      type: z.enum(["remote", "onsite", "hybrid"]),
-      address: z
-        .string()
-        .optional()
-        .refine(
-          (val) => {
-            // Only validate if it's provided and not remote
-            if (!val) return true;
-            return /^[A-Za-z\s\-\.]+(?:[,]\s*[A-Za-z\s\-\.]+)*$/.test(val);
-          },
-          {
-            message:
-              "Please enter a valid location (e.g., 'City, Country' or 'City, State')",
-          }
-        ),
-    })
-    .refine((data) => !(data.type === "hybrid" && !data.address), {
-      message: "Address is required for hybrid positions",
-      path: ["address"],
-    })
-    .refine((data) => !(data.type === "onsite" && !data.address), {
-      message: "Address is required for onsite positions",
-      path: ["address"],
-    }),
-  job_type: z.enum([
+  location: locationSchema,
+  jobType: z.enum([
     "fulltime",
     "parttime",
     "contract",
-    "freelance",
+    "volunteer",
     "internship",
   ]),
 });
@@ -123,6 +120,14 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   };
 }
 
+interface LocationSuggestion {
+  address: string;
+  coordinates: {
+    lat: number;
+    lon: number;
+  };
+}
+
 export default function VerifyPage() {
   const [unverifiedJobs, setUnverifiedJobs] = useState<
     Record<string, JobReport>
@@ -132,7 +137,7 @@ export default function VerifyPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isValidatingLocation, setIsValidatingLocation] = useState(false);
   const [skillInput, setSkillInput] = useState("");
@@ -153,7 +158,7 @@ export default function VerifyPage() {
         type: "onsite",
         address: "",
       },
-      job_type: undefined,
+      jobType: "fulltime",
     },
   });
 
@@ -178,64 +183,23 @@ export default function VerifyPage() {
   };
 
   const updateFormWithJobData = (job: JobReport) => {
-    // Convert job_type to enum value if it exists
-    let jobType:
-      | "fulltime"
-      | "parttime"
-      | "contract"
-      | "freelance"
-      | "internship"
-      | undefined;
+    // Format date
+    const formattedDate = job.date ? new Date(job.date) : new Date();
   
-    if (job.job_type) {
-      const normalizedType = job.job_type.toLowerCase().replace(/[^a-z]/g, "");
-      if (
-        [
-          "fulltime",
-          "parttime",
-          "contract",
-          "freelance",
-          "internship",
-        ].includes(normalizedType)
-      ) {
-        jobType = normalizedType as any;
-      }
-    }
+    // Parse location data based on the new schema
+    const locationData = {
+      type: job.locationType || "onsite",
+      address: "",
+      coordinates: { lat: 0, lon: 0 },
+    };
   
-    // Format the date properly for the date input
-    let formattedDate = new Date();
-    if (job.date) {
-      try {
-        formattedDate = new Date(job.date);
-        if (isNaN(formattedDate.getTime())) {
-          console.error("Invalid date format:", job.date);
-          formattedDate = new Date(); // Default to today
-        }
-      } catch (error) {
-        console.error("Error parsing date:", error, job.date);
-        formattedDate = new Date(); // Default to today
-      }
-    }
-  
-    // Parse location into type and address
-    let locationType: "remote" | "onsite" | "hybrid" = "onsite";
-    let locationAddress = "";
-    
-    if (job.location) {
-      // Check if location is already an object with type and address properties
-      if (typeof job.location === 'object' && job.location !== null && 'type' in job.location) {
-        const location = job.location as { type: "remote" | "onsite" | "hybrid"; address?: string };
-        locationType = location.type;
-        locationAddress = location.address || "";
-      } else if (typeof job.location === 'string') {
-        // If location is a string, determine if it's "Remote" or an address
-        if (job.location.toLowerCase() === "remote") {
-          locationType = "remote";
-        } else {
-          locationType = "onsite"; // Default to onsite for other locations
-          locationAddress = job.location;
-        }
-      }
+    // If location exists and is not remote, set address and coordinates
+    if (job.locationType !== "remote" && typeof job.location === "object" && job.location !== null) {
+      locationData.address = job.location.address || "";
+      locationData.coordinates = {
+        lat: job.location.lat,
+        lon: job.location.lon,
+      };
     }
   
     form.reset({
@@ -246,12 +210,9 @@ export default function VerifyPage() {
       description: job.description || "",
       salary: job.salary || "",
       skills: job.skills?.length ? job.skills : [""],
-      benefits: job.benefits?.length ? job.benefits : [""],
-      location: {
-        type: locationType,
-        address: locationAddress,
-      },
-      job_type: jobType || "fulltime", 
+      benefits: job.benefits?.length ? job.benefits : [],
+      location: locationData,
+      jobType: job.jobType as "fulltime" | "parttime" | "contract" | "volunteer" | "internship"
     });
   };
 
@@ -276,42 +237,34 @@ export default function VerifyPage() {
 
       const formData = form.getValues();
 
-      // Format location based on type before sending to API
-      const formattedLocation =
-        formData.location.type === "remote"
-          ? "Remote"
-          : formData.location.address;
-
-      // Prepare job data for API
-      const jobData = {
-        ...unverifiedJobs[jobId],
-        title: formData.title,
-        company: formData.company,
-        url: formData.url,
-        date: formData.date,
-        description: formData.description,
-        salary: formData.salary || "",
-        skills: formData.skills.filter((skill) => skill.trim() !== ""),
-        benefits: (formData.benefits || []).filter(
-          (benefit) => benefit.trim() !== ""
-        ),
-        location: formattedLocation, // Use formatted location string
-        job_type: formData.job_type || "",
-      };
+    // Format the job data to match the schema
+    const jobData = {
+      ...unverifiedJobs[jobId],
+      title: formData.title,
+      company: formData.company,
+      url: formData.url,
+      date: format(formData.date, 'yyyy-MM-dd'),
+      description: formData.description,
+      salary: formData.salary || "",
+      skills: formData.skills.filter((skill) => skill.trim() !== ""),
+      benefits: formData.benefits.filter((benefit) => benefit.trim() !== ""),
+      location: {
+        type: formData.location.type,
+        address: formData.location.type === "remote" ? undefined : formData.location.address,
+        coordinates: formData.location.type === "remote" ? undefined : formData.location.coordinates,
+      },
+      jobType: formData.jobType,
+    };
 
       const response = await fetch(
         `/api/job/verify?jobId=${jobId}&verified=${verified}`,
         {
           method: "PATCH",
-          body: JSON.stringify({
-            ...jobData,
-            skills: JSON.stringify(jobData.skills),
-            benefits: JSON.stringify(jobData.benefits),
-          }),
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${await user.getIdToken()}`,
           },
+          body: JSON.stringify(jobData)
         }
       );
 
@@ -371,34 +324,33 @@ export default function VerifyPage() {
   
     const formData = form.getValues();
   
-    // Format location based on type before saving
-    const formattedLocation = 
-      formData.location.type === "remote" 
-        ? "Remote" 
-        : formData.location.address;
-  
-    // Update the job in state
-    const updatedJob = {
+    // Update the job in state with the new schema
+    const updatedJob: JobReport = {
       ...unverifiedJobs[activeJobId],
       title: formData.title,
       company: formData.company,
       url: formData.url,
-      date: formData.date,
+      date: format(formData.date, 'yyyy-MM-dd'),
       description: formData.description,
-      salary: formData.salary || "",
+      salary: formData.salary || null,
       skills: formData.skills.filter((skill) => skill.trim() !== ""),
-      location: formattedLocation,
-      job_type: formData.job_type || "",
-      benefits: (formData.benefits || []).filter(benefit => benefit.trim() !== ""),
+      benefits: formData.benefits.filter((benefit) => benefit.trim() !== "") || [],
+      location: formData.location.type === "remote" 
+        ? null 
+        : {
+            address: formData.location.address || "",
+            lat: formData.location.coordinates?.lat || 0,
+            lon: formData.location.coordinates?.lon || 0,
+          },
+      locationType: formData.location.type,
+      jobType: formData.jobType,
     };
-  
     setUnverifiedJobs({
       ...unverifiedJobs,
       [activeJobId]: updatedJob as JobReport,
     });
   
     setIsEditing(false);
-  
     toast.success("Changes saved successfully");
   };
 
@@ -408,11 +360,10 @@ export default function VerifyPage() {
         setLocationSuggestions([]);
         return;
       }
-
-      // Create a request ID to handle race conditions
+  
       const requestId = Date.now();
       (fetchLocationSuggestions as any).lastRequestId = requestId;
-
+  
       setIsValidatingLocation(true);
       try {
         const response = await fetch(
@@ -420,27 +371,51 @@ export default function VerifyPage() {
             query
           )}&limit=5&addressdetails=1`
         );
-
-        // Only process if this is still the most recent request
+  
         if ((fetchLocationSuggestions as any).lastRequestId !== requestId) {
           return;
         }
-
+  
         if (response.ok) {
           const data = await response.json();
-          const suggestions = data
+          const suggestions: LocationSuggestion[] = data
             .map((item: any) => {
-              const city =
-                item.address?.city ||
-                item.address?.town ||
-                item.address?.village ||
-                "";
-              const state = item.address?.state || "";
-              return city && state ? `${city}, ${state}` : "";
+              // Get the most specific location name with fallbacks
+              const locationName = 
+                item.address?.city || 
+                item.address?.town || 
+                item.address?.village;
+      
+              // Skip if no location name found
+              if (!locationName) return null;
+      
+              // For US addresses, use state
+              if (item.address?.country === "United States" && item.address?.state) {
+                return {
+                  address: `${locationName}, ${item.address.state}`,
+                  coordinates: {
+                    lat: parseFloat(item.lat),
+                    lon: parseFloat(item.lon),
+                  }
+                };
+              }
+              
+              // For international addresses, use country
+              if (item.address?.country) {
+                return {
+                  address: `${locationName}, ${item.address.country}`,
+                  coordinates: {
+                    lat: parseFloat(item.lat),
+                    lon: parseFloat(item.lon),
+                  }
+                };
+              }
+  
+              return null;
             })
-            .filter(Boolean);
-
-          setLocationSuggestions([...new Set(suggestions)] as string[]);
+            .filter((item: any): item is LocationSuggestion => item !== null);
+  
+          setLocationSuggestions(suggestions);
         }
       } catch (error) {
         console.error("Error fetching location suggestions:", error);
@@ -450,7 +425,7 @@ export default function VerifyPage() {
         }
       }
     }, 300),
-    [] // Empty dependency array since we don't need to recreate this function
+    []
   );
 
   const addSkill = () => {
@@ -672,74 +647,57 @@ export default function VerifyPage() {
                       {/* Only show address field if not remote */}
                       {form.watch("location.type") !== "remote" && (
                         <FormField
-                          control={form.control}
-                          name="location.address"
-                          render={({ field }) => (
-                            <FormItem className="relative">
-                              <FormLabel>Location Address</FormLabel>
-                              <FormControl>
-                                <div className="flex items-center">
-                                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                                  <Input
-                                    {...field}
-                                    placeholder="Enter city, state"
-                                    onChange={(e) => {
-                                      field.onChange(e);
-                                      fetchLocationSuggestions(e.target.value);
+                        control={form.control}
+                        name="location.address"
+                        render={({ field }) => (
+                          <FormItem className="relative">
+                            <FormLabel>Location Address</FormLabel>
+                            <FormControl>
+                              <div className="flex items-center">
+                                <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                                <Input
+                                  {...field}
+                                  placeholder="Enter city, state"
+                                  onChange={(e) => {
+                                    field.onChange(e);
+                                    fetchLocationSuggestions(e.target.value);
+                                    setShowSuggestions(true);
+                                  }}
+                                  disabled={!isEditing || isSubmitting || form.watch("location.type") === "remote"}
+                                  onBlur={() => {
+                                    field.onBlur();
+                                    setTimeout(() => setShowSuggestions(false), 200);
+                                  }}
+                                  onFocus={() => {
+                                    if (field.value && locationSuggestions.length > 0) {
                                       setShowSuggestions(true);
+                                    }
+                                  }}
+                                />
+                              </div>
+                            </FormControl>
+                            {showSuggestions && locationSuggestions.length > 0 && (
+                              <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                                {locationSuggestions.map((suggestion, index) => (
+                                  <div
+                                    key={index}
+                                    className="p-2 hover:bg-muted cursor-pointer"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      form.setValue("location.address", suggestion.address);
+                                      form.setValue("location.coordinates", suggestion.coordinates);
+                                      setShowSuggestions(false);
                                     }}
-                                    disabled={!isEditing || isSubmitting}
-                                    onBlur={() => {
-                                      field.onBlur();
-                                      setTimeout(
-                                        () => setShowSuggestions(false),
-                                        200
-                                      );
-                                    }}
-                                    onFocus={() => {
-                                      if (
-                                        field.value &&
-                                        locationSuggestions.length > 0
-                                      ) {
-                                        setShowSuggestions(true);
-                                      }
-                                    }}
-                                  />
-                                </div>
-                              </FormControl>
-                              {isValidatingLocation && (
-                                <div className="absolute right-3 top-9">
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                </div>
-                              )}
-                              {showSuggestions &&
-                                locationSuggestions.length > 0 && (
-                                  <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
-                                    {locationSuggestions.map(
-                                      (suggestion, index) => (
-                                        <div
-                                          key={index}
-                                          className="p-2 hover:bg-muted cursor-pointer"
-                                          onMouseDown={(e) => {
-                                            e.preventDefault();
-                                            field.onChange(suggestion);
-                                            setShowSuggestions(false);
-                                          }}
-                                        >
-                                          {suggestion}
-                                        </div>
-                                      )
-                                    )}
+                                  >
+                                    {suggestion.address}
                                   </div>
-                                )}
-                              <FormDescription>
-                                Enter a valid city and state (e.g., "San
-                                Francisco, CA")
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                                ))}
+                              </div>
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       )}
 
                       {/* Date Field */}
@@ -797,7 +755,7 @@ export default function VerifyPage() {
 
                     <FormField
                       control={form.control}
-                      name="job_type"
+                      name="jobType"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Job Type</FormLabel>
