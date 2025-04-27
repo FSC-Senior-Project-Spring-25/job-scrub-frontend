@@ -16,20 +16,17 @@ import { toast } from "sonner";
 import { useAuth } from "./auth-context";
 import { Job } from "@/types/types";
 import AnimatedLogo from "@/components/animated-logo";
-
 export default function HomePage() {
   const [search, setSearch] = useState("");
   const [jobs, setJobs] = useState<Record<string, Job>>({});
   const [isLoading, setIsLoading] = useState(false);
   const { user, loading } = useAuth();
-
   // Fetch jobs when the component mounts and user is authenticated
   useEffect(() => {
     if (user) {
       fetchJobs();
     }
   }, [user]);
-
   const fetchJobs = async () => {
     setIsLoading(true);
     try {
@@ -43,18 +40,15 @@ export default function HomePage() {
       setIsLoading(false);
     }
   };
-
   // Format salary for display
   const formatSalary = (salary: string) => {
     const salaryNum = parseInt(salary);
     if (isNaN(salaryNum)) return "Salary not specified";
-
     if (salaryNum >= 1000) {
       return `$${(salaryNum / 1000).toFixed(0)}k`;
     }
     return `$${salaryNum}`;
   };
-
   // Format date to show days ago
   const formatDate = (dateString: string) => {
     const jobDate = new Date(dateString);
@@ -66,11 +60,9 @@ export default function HomePage() {
     if (diffDays === 1) return "Yesterday";
     return `${diffDays} days ago`;
   };
-
   // Filter jobs based on search
   const filteredJobs = Object.entries(jobs).filter(([id, job]) => {
     if (!job || typeof job !== 'object') return false;
-
     const searchLower = search.toLowerCase();
     return (
       job.title.toLowerCase().includes(searchLower) ||
@@ -87,22 +79,20 @@ export default function HomePage() {
       </div>
     );
   }
-
-
 // 2. Not logged in (welcome page + scrubby)
 if (!user) {
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row items-center justify-between px-12 py-12 gap-25">
+    <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col md:flex-row items-center justify-between px-12 py-12 gap-25">
       {/* Left side: Scrubby video */}
       <div className="flex-1 max-w-lg rounded-xl p-12 text-center self-start -mt-8" style={{ backgroundColor: "#DDDBD5" }}>
         <video autoPlay muted loop playsInline className="mx-auto w-full mb-4 rounded">
           <source src="/assets/Scrubby_logo.mp4" type="video/mp4" />
           Your browser does not support the video tag.
         </video>
-        <p className="text-black text-sm">
-        JobScrub simplifies your career journey with powerful tools designed to match you with the right opportunities. 
-        Upload your resume, discover personalized job listings, and manage your applications — all in one place. 
-        Your next career move starts here.
+        <p className="text-black dark:text-foreground text-sm">
+          JobScrub simplifies your career journey with powerful tools designed to match you with the right opportunities. 
+          Upload your resume, discover personalized job listings, and manage your applications — all in one place. 
+          Your next career move starts here.
         </p>
         <Link href="/signup">
           <button className="mt-4 bg-green-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-green-700">
@@ -110,33 +100,27 @@ if (!user) {
           </button>
         </Link>
       </div>
-
-{/* Right side:text */}
-<div className="flex-1 flex flex-col items-center text-center">
+      {/* Right side: text */}
+      <div className="flex-1 flex flex-col items-center text-center">
         <div className="max-w-xl mx-auto">
-          
-          <p className="text-green-600 text-base font-semibold mb-2">
+          <p className="text-green-600 dark:text-green-400 text-base font-semibold mb-2">
             Find Your Dream Job Today!
           </p>
-
-          <h1 className="text-6xl font-extrabold text-black drop-shadow-md leading-tight drop-shadow-[0_2px_6px_#DDDBD5]">
+          <h1 className="text-6xl font-extrabold text-black dark:text-foreground drop-shadow-[0_2px_6px_#DDDBD5] leading-tight">
             Welcome to
           </h1>
-          <h1 className="text-6xl font-extrabold text-black-700 drop-shadow-md mt-2 leading-tight">
+          <h1 className="text-6xl font-extrabold text-black dark:text-foreground drop-shadow-md mt-2 leading-tight">
             JobScrub!
           </h1>
-
-          <p className="text-gray-700 text-lg mt-6 leading-relaxed font-medium">
+          <p className="text-gray-700 dark:text-muted-foreground text-lg mt-6 leading-relaxed font-medium">
             Your Career Journey, Simplified.
           </p>
-
           {/* Bullet Points */}
-          <ul className="text-gray-600 text-sm mt-6 space-y-2 text-left pl-2">
+          <ul className="text-gray-600 dark:text-muted-foreground text-sm mt-6 space-y-2 text-left pl-2">
             <li>• Upload your resume in seconds</li>
             <li>• Discover job matches instantly</li>
             <li>• Track and manage your applications easily</li>
           </ul>
-
           {/* Buttons */}
           <div className="mt-8 flex flex-col items-center">
             <Link href="/signup">
@@ -150,48 +134,39 @@ if (!user) {
           </div>
         </div>
       </div>
-
     </div>
   );
-}  
-
-   // If user is logged in, show the dashboard/main application
- return (
-  <div className="min-h-screen bg-gray-100 flex flex-col">
-    {/* Main content */}
+}
+// If user is logged in, show the dashboard/main application
+return (
+  <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col">
     <main className="flex-1 container mx-auto px-4 py-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Sidebar */}
         <div className="md:col-span-1">
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="bg-white dark:bg-card dark:text-foreground rounded-lg shadow p-4 border border-gray-300 dark:border-muted">
             <h2 className="font-semibold text-lg mb-4">Quick Links</h2>
             <nav className="space-y-2">
-            <ApplicationBadge />
-            <SavedJobsBadge />
-              {/*<Link
-                href="/applications"
-                className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
-              >
-                <FaRegClock className="mr-2" /> My Job Applications
-              </Link>8 
-              */}
+              <ApplicationBadge />
+              <SavedJobsBadge />
             </nav>
           </div>
         </div>
-        {/* Main content area */}
+
+        {/* Main Content */}
         <div className="md:col-span-2">
           {/* Search Bar */}
-          <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <div className="bg-white dark:bg-card dark:text-foreground rounded-lg shadow p-4 mb-6 border border-gray-300 dark:border-muted">
             <h2 className="text-lg font-semibold mb-3">
               Find Your Next Opportunity
-            </h2>
+              </h2>
             <div className="flex items-center">
-              <div className="flex-1 flex items-center border border-gray-300 rounded-lg bg-white px-4 py-2">
-                <FaSearch className="text-gray-500" />
+              <div className="flex-1 flex items-center border-2 border-gray-300 dark:border-muted rounded-lg bg-white dark:bg-muted px-4 py-2">
+                <FaSearch className="text-gray-300 dark:text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search for job titles, companies, or keywords"
-                  className="ml-2 flex-1 outline-none"
+                  className="ml-2 flex-1 outline-none bg-transparent text-gray-800 dark:text-gray-200"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -199,31 +174,28 @@ if (!user) {
               <button
                 className="ml-3 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 onClick={() =>
-                  filteredJobs.length > 0
-                    ? null
-                    : toast.error("No matching jobs found")
+                  filteredJobs.length > 0 
+                  ? null 
+                  : toast.error("No matching jobs found")
                 }
               >
                 Search
               </button>
             </div>
+            {/* Tags */}
             <div className="flex flex-wrap gap-2 mt-3">
-              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
-                Remote
-              </button>
-              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
-                Full-time
-              </button>
-              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
-                Part-time
-              </button>
-              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
-                Tech
-              </button>
+              {["Remote", "Full-time", "Part-time", "Tech"].map((tag) => (
+                <button
+                  key={tag}
+                  className="px-3 py-1 border border-gray-300 dark:border-muted bg-gray-100 dark:bg-muted text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-muted transition"
+                >
+                  {tag}
+                </button>
+              ))}
             </div>
           </div>
           {/* Job Listings */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white dark:bg-card dark:text-foreground rounded-lg shadow p-6 border border-gray-300 dark:border-muted">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Job Listings</h2>
               <button
@@ -235,51 +207,51 @@ if (!user) {
             </div>
             {isLoading ? (
               <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-600"></div>
-                <p className="mt-2 text-gray-600">Loading jobs...</p>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-2 border-green-600"></div>
+                <p className="mt-2 text-gray-600 dark:text-muted-foreground">Loading jobs...</p>
               </div>
             ) : filteredJobs.length > 0 ? (
               <div className="space-y-4">
                 {filteredJobs.map(([jobId, job]) => (
                   <div
                     key={jobId}
-                    className="border rounded-lg p-4 hover:shadow-md transition"
+                    className="border-2 border-gray-300 dark:border-muted rounded-lg p-4 hover:shadow-md transition"
                   >
                     <div className="flex justify-between">
                       <h3 className="font-medium text-lg">{job.title}</h3>
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-gray-300 dark:text-muted-foreground">
                         {formatDate(job.date)}
                       </span>
                     </div>
-                    <p className="text-gray-700 font-medium">{job.company}</p>
+                    <p className="text-gray-700 dark:text-muted-foreground font-medium">{job.company}</p>
                     <div className="flex flex-wrap gap-2 my-2">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <FaBriefcase className="mr-1" />
+                      <div className="flex items-center text-sm text-gray-600 dark:text-muted-foreground">
+                        <FaBriefcase className="mr-1" /> 
                         {job.job_type}
                       </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <FaMapMarkerAlt className="mr-1" />
+                      <div className="flex items-center text-sm text-gray-600 dark:text-muted-foreground">
+                        <FaMapMarkerAlt className="mr-1" /> 
                         {job.location}
                       </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <FaDollarSign className="mr-1" />
+                      <div className="flex items-center text-sm text-gray-600 dark:text-muted-foreground">
+                        <FaDollarSign className="mr-1" /> 
                         {formatSalary(job.salary)}
                       </div>
                     </div>
-                    <p className="text-sm text-gray-600 line-clamp-2 mt-1">
+                    <p className="text-sm text-gray-600 dark:text-muted-foreground line-clamp-2 mt-1">
                       {job.description}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-1">
                       {job.skills.slice(0, 3).map((skill, index) => (
                         <span
                           key={index}
-                          className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded"
+                          className="bg-gray-100 dark:bg-muted text-gray-800 dark:text-gray-300 text-xs px-2 py-1 rounded"
                         >
                           {skill}
                         </span>
                       ))}
                       {job.skills.length > 3 && (
-                        <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+                        <span className="bg-gray-100 dark:bg-muted text-gray-800 dark:text-gray-300 text-xs px-2 py-1 rounded">
                           +{job.skills.length - 3} more
                         </span>
                       )}
@@ -290,7 +262,7 @@ if (!user) {
                           ✓ Verified listing
                         </span>
                       ) : (
-                        <span className="text-xs text-gray-500 flex items-center">
+                        <span className="text-xs text-gray-300 dark:text-muted-foreground flex items-center">
                           Pending verification
                         </span>
                       )}
@@ -311,7 +283,7 @@ if (!user) {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-lg text-gray-600">
+                <p className="text-lg text-gray-600 dark:text-muted-foreground">
                   No jobs found{search ? " matching your search" : ""}.
                 </p>
                 {search && (
@@ -326,10 +298,7 @@ if (!user) {
             )}
             {filteredJobs.length > 0 && (
               <div className="mt-6 text-center">
-                <Link
-                  href="/jobs/browse"
-                  className="text-blue-600 hover:underline"
-                >
+                <Link href="/jobs/browse" className="text-blue-600 hover:underline">
                   View All Job Listings
                 </Link>
               </div>

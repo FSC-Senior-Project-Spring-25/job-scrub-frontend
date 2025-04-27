@@ -63,10 +63,32 @@ body {
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  /* Universal text colors */
   body {
-    @apply bg-background text-foreground;
+    @apply text-gray-800 dark:text-gray-200 bg-background;
+  }
+
+  /* Fix backgrounds */
+  .bg-white {
+    @apply dark:bg-card;
+  }
+
+  /* Fix borders */
+  .border-gray-300 {
+    @apply dark:border-gray-700;
+  }
+
+  /* Fix text colors */
+  .text-gray-700 {
+    @apply dark:text-gray-300;
+  }
+
+  .text-gray-600 {
+    @apply dark:text-gray-400;
+  }
+
+  /* Fix hover backgrounds */
+  .hover\:bg-gray-100:hover {
+    @apply dark:hover:bg-gray-700;
   }
 }
