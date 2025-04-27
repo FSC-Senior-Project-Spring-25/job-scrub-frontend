@@ -55,13 +55,13 @@ export default function Login() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center">Login</h2>
+    <div className="flex flex-col items-center justify-start min-h-screen bg-gray-300 dark:bg-background pt-20 px-4">
+  <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-card dark:text-foreground rounded-lg shadow-md border border-gray-300 dark:border-muted">
+    <h2 className="text-2xl font-bold text-center">Login</h2>
         {error && <p className="text-red-500 text-center">{error}</p>}
         <form className="space-y-6" onSubmit={handleLogin}>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-foreground">
               Email
             </label>
             <input
@@ -72,11 +72,11 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={isSubmitting}
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-3 py-2 mt-1 border border-gray-300 dark:border-muted rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-600"
             />
           </div>
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-foreground">
               Password
             </label>
             <input
@@ -87,13 +87,13 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={isSubmitting}
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-3 py-2 mt-1 border border-gray-300 dark:border-muted rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-600"
             />
           </div>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-green-300"
+            className="w-full px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
           >
             {isSubmitting ? (
               <div className="flex items-center justify-center">
@@ -105,7 +105,7 @@ export default function Login() {
             )}
           </button>
         </form>
-        <p className="text-center text-gray-600">
+        <p className="text-center text-gray-600 dark:text-muted-foreground">
           Don't have an account?{' '}
           <Link href="/signup" className="text-blue-600 hover:underline">
             Sign up here
