@@ -1,5 +1,8 @@
 'use client';
 
+export const unstable_runtimeJS = true;
+
+
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
@@ -153,23 +156,23 @@ export default function JobDetailPage() {
   if (!job) return <div className="p-6 text-red-500">Job not found.</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center px-6 py-10">
+    <div className="min-h-screen bg-gray-100 dark:bg-background flex justify-center px-6 py-10">
       {/* Sidebar */}
-      <div className="bg-white rounded-lg shadow p-4 h-fit self-start w-64 mr-6">
+      <div className="bg-white dark:bg-card dark:border dark:border-muted rounded-lg shadow p-4 h-fit self-start w-64 mr-6">
         <h2 className="font-semibold text-lg mb-4">Quick Links</h2>
         <nav className="space-y-2">
-          <Link href="/applications" className="flex px-3 py-2 rounded hover:bg-gray-100 items-center">
+          <Link href="/applications" className="flex px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-muted items-center">
             <FaRegClock className="mr-2" /> My Job Applications
             {appliedCount > 0 && (
-              <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">
+              <span className="ml-auto text-sm bg-gray-200 dark:bg-muted dark:text-foreground px-2 py-0.5 rounded text-gray-700">
                 {appliedCount}
               </span>
             )}
           </Link>
-          <Link href="/saved_jobs" className="flex px-3 py-2 rounded hover:bg-gray-100 items-center">
+          <Link href="/saved_jobs" className="flex px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-muted items-center">
             <FaRegBookmark className="mr-2" /> Saved Jobs
             {savedCount > 0 && (
-              <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">
+              <span className="ml-auto text-sm bg-gray-200 dark:bg-muted dark:text-foreground px-2 py-0.5 rounded text-gray-700">
                 {savedCount}
               </span>
             )}
@@ -177,25 +180,26 @@ export default function JobDetailPage() {
         </nav>
         {job?.company && <CompanyMetrics companyName={job.company} />}
       </div>
-
-            
+  
+      {/* Main Content */}
       <main className="flex-1 flex justify-start">
-        <div className="bg-white rounded-lg shadow p-8 space-y-8 w-full">
+      <div className="bg-white dark:bg-card border-2 border-gray-300 dark:border-muted rounded-lg shadow p-8 space-y-8 w-full">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-2">
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-foreground flex items-center gap-2">
                 {job.title}
                 <FaCheckCircle
                   className={job.verified ? "text-green-600 text-xl" : "text-gray-400 text-xl"}
                 />
               </h1>
-              <p className="text-gray-700 text-sm mt-1">
+              <p className="text-gray-700 dark:text-muted-foreground text-sm mt-1">
                 {new Date(job.date).toLocaleDateString()} | {job.location}, {job.job_type}
               </p>
-              <p className="text-gray-600 text-md mt-1 font-medium">
+              <p className="text-gray-600 dark:text-muted-foreground text-md mt-1 font-medium">
                 {job.company}
               </p>
-
+  
+              {/* Match Score */}
               {matchScore !== null && (
                 <div className="mt-6 space-y-4">
                   <h3 className="text-md font-semibold">Am I a good fit?</h3>
@@ -214,10 +218,7 @@ export default function JobDetailPage() {
                           cx="40"
                           cy="40"
                           r="34"
-                          stroke={
-                            matchScore < 0.3 ? "#ef4444" :
-                            matchScore < 0.6 ? "#facc15" : "#22c55e"
-                          }
+                          stroke={matchScore < 0.3 ? "#ef4444" : matchScore < 0.6 ? "#facc15" : "#22c55e"}
                           strokeWidth="8"
                           strokeDasharray={2 * Math.PI * 34}
                           strokeDashoffset={2 * Math.PI * 34 * (1 - matchScore)}
@@ -226,11 +227,11 @@ export default function JobDetailPage() {
                           className="transition-all duration-500"
                         />
                       </svg>
-                      <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-gray-800">
+                      <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-gray-800 dark:text-foreground">
                         {(matchScore * 100).toFixed(0)}%
                       </div>
                     </div>
-                    <div className="text-sm text-gray-700 font-medium">
+                    <div className="text-sm text-gray-700 dark:text-muted-foreground font-medium">
                       You are {(matchScore * 100).toFixed(0)}% compatible with the job description.
                       {matchScore < 0.3 && <div className="mt-1 text-red-600">Let’s improve your resume!</div>}
                       {matchScore >= 0.3 && matchScore < 0.6 && <div className="mt-1 text-yellow-700">We can help</div>}
@@ -240,7 +241,8 @@ export default function JobDetailPage() {
                 </div>
               )}
             </div>
-
+  
+            {/* Apply and Save Buttons */}
             <div className="flex flex-col gap-2">
               <button
                 onClick={handleApply}
@@ -256,25 +258,28 @@ export default function JobDetailPage() {
               </button>
             </div>
           </div>
-
+  
+          {/* Job Description */}
           <div>
             <h2 className="text-lg font-semibold mb-1">Job Description</h2>
-            <p className="text-gray-800 whitespace-pre-line text-sm leading-relaxed">
+            <p className="text-gray-800 dark:text-muted-foreground whitespace-pre-line text-sm leading-relaxed">
               {job.description}
             </p>
           </div>
-
+  
+          {/* Salary */}
           {job.salary && (
             <div>
               <h2 className="text-lg font-semibold mb-1">Salary</h2>
-              <p className="text-gray-800">{job.salary}</p>
+              <p className="text-gray-800 dark:text-muted-foreground">{job.salary}</p>
             </div>
           )}
-
+  
+          {/* Benefits and Skills */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div>
               <h2 className="text-lg font-semibold mb-2">Benefits</h2>
-              <ul className="list-disc list-inside text-gray-700 text-sm">
+              <ul className="list-disc list-inside text-gray-700 dark:text-muted-foreground text-sm">
                 {job.benefits?.map((b, i) => (
                   <li key={i}>{b}</li>
                 ))}
@@ -282,7 +287,7 @@ export default function JobDetailPage() {
             </div>
             <div>
               <h2 className="text-lg font-semibold mb-2">Skills Needed</h2>
-              <ul className="list-disc list-inside text-gray-700 text-sm">
+              <ul className="list-disc list-inside text-gray-700 dark:text-muted-foreground text-sm">
                 {job.skills?.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
@@ -290,16 +295,17 @@ export default function JobDetailPage() {
             </div>
           </div>
         </div>
-
+  
+        {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded shadow-xl space-y-4">
+            <div className="bg-white dark:bg-card dark:border dark:border-muted p-6 rounded shadow-xl space-y-4">
               <p className="text-lg font-medium">Did you apply for this job?</p>
               <div className="flex justify-end gap-4">
                 <Button onClick={() => confirmApplication(true)} className="bg-green-600 hover:bg-green-700 text-white">
                   Yes
                 </Button>
-                <Button onClick={() => confirmApplication(false)} className="bg-gray-300 text-black">
+                <Button onClick={() => confirmApplication(false)} className="bg-gray-300 dark:bg-muted dark:text-foreground text-black">
                   No
                 </Button>
               </div>
@@ -310,3 +316,12 @@ export default function JobDetailPage() {
     </div>
   );
 }
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+

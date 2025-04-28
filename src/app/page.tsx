@@ -1,5 +1,5 @@
 "use client";
-
+export const unstable_runtimeJS = true;
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -250,16 +250,17 @@ export default function HomePage() {
 // 2. Not logged in (welcome page + scrubby)
 if (!user) {
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col md:flex-row items-center justify-between px-12 py-12 gap-25">
-      {/* Left side: Scrubby video */}
-      <div className="flex-1 max-w-lg rounded-xl p-12 text-center self-start -mt-8" style={{ backgroundColor: "#DDDBD5" }}>
-        <video autoPlay muted loop playsInline className="mx-auto w-full mb-4 rounded">
-          <source src="/assets/Scrubby_logo.mp4" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+    <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col md:flex-row items-center justify-between px-12 py-12 gap-12">
+      {/* Left side: Scrubby GIF */}
+      <div className="flex-1 max-w-lg rounded-xl p-12 text-center self-start -mt-8 bg-[#DDDBD5] dark:bg-muted shadow-md">
+        <img
+          src="/assets/Scrubby-logo.gif"
+          alt="Scrubby Logo"
+          className="mx-auto w-full mb-4 rounded"
+        />
         <p className="text-black dark:text-foreground text-sm">
-          JobScrub simplifies your career journey with powerful tools designed to match you with the right opportunities. 
-          Upload your resume, discover personalized job listings, and manage your applications — all in one place. 
+          JobScrub simplifies your career journey with powerful tools designed to match you with the right opportunities.
+          Upload your resume, discover personalized job listings, and manage your applications — all in one place.
           Your next career move starts here.
         </p>
         <Link href="/signup">
@@ -268,27 +269,30 @@ if (!user) {
           </button>
         </Link>
       </div>
+
       {/* Right side: text */}
       <div className="flex-1 flex flex-col items-center text-center">
         <div className="max-w-xl mx-auto">
           <p className="text-green-600 dark:text-green-400 text-base font-semibold mb-2">
             Find Your Dream Job Today!
           </p>
-          <h1 className="text-6xl font-extrabold text-black dark:text-foreground drop-shadow-[0_2px_6px_#DDDBD5] leading-tight">
+          <h1 className="text-6xl font-extrabold text-black dark:text-foreground">
             Welcome to
           </h1>
-          <h1 className="text-6xl font-extrabold text-black dark:text-foreground drop-shadow-md mt-2 leading-tight">
+          <h1 className="text-6xl font-extrabold text-black dark:text-foreground">
             JobScrub!
           </h1>
           <p className="text-gray-700 dark:text-muted-foreground text-lg mt-6 leading-relaxed font-medium">
             Your Career Journey, Simplified.
           </p>
+
           {/* Bullet Points */}
           <ul className="text-gray-600 dark:text-muted-foreground text-sm mt-6 space-y-2 text-left pl-2">
             <li>• Upload your resume in seconds</li>
             <li>• Discover job matches instantly</li>
             <li>• Track and manage your applications easily</li>
           </ul>
+
           {/* Buttons */}
           <div className="mt-8 flex flex-col items-center">
             <Link href="/signup">
@@ -305,6 +309,7 @@ if (!user) {
     </div>
   );
 }
+
 // If user is logged in, show the dashboard/main application
 return (
   <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col">
@@ -312,7 +317,7 @@ return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Sidebar */}
         <div className="md:col-span-1">
-          <div className="bg-white dark:bg-card dark:text-foreground rounded-lg shadow p-4 border border-gray-300 dark:border-muted">
+          <div className="sticky top-24 bg-white dark:bg-card dark:text-foreground rounded-lg shadow p-4 border border-gray-300 dark:border-muted">
             <h2 className="font-semibold text-lg mb-4">Quick Links</h2>
             <nav className="space-y-2">
               <ApplicationBadge />
@@ -327,7 +332,7 @@ return (
           <div className="bg-white dark:bg-card dark:text-foreground rounded-lg shadow p-4 mb-6 border border-gray-300 dark:border-muted">
             <h2 className="text-lg font-semibold mb-3">
               Find Your Next Opportunity
-              </h2>
+            </h2>
             <div className="flex items-center">
               <div className="flex-1 flex items-center border-2 border-gray-300 dark:border-muted rounded-lg bg-white dark:bg-muted px-4 py-2">
                 <FaSearch className="text-gray-300 dark:text-gray-400" />
@@ -342,26 +347,28 @@ return (
               <button
                 className="ml-3 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 onClick={() =>
-                  filteredJobs.length > 0 
-                  ? null 
-                  : toast.error("No matching jobs found")
+                  filteredJobs.length > 0
+                    ? null
+                    : toast.error("No matching jobs found")
                 }
               >
                 Search
               </button>
             </div>
+
             {/* Tags */}
             <div className="flex flex-wrap gap-2 mt-3">
               {["Remote", "Full-time", "Part-time", "Tech"].map((tag) => (
                 <button
                   key={tag}
-                  className="px-3 py-1 border border-gray-300 dark:border-muted bg-gray-100 dark:bg-muted text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-muted transition"
+                  className="px-3 py-1 border border-gray-300 dark:border-muted bg-gray-100 dark:bg-muted text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-muted-foreground"
                 >
                   {tag}
                 </button>
               ))}
             </div>
           </div>
+
           {/* Job Listings */}
           <div className="bg-white dark:bg-card dark:text-foreground rounded-lg shadow p-6 border border-gray-300 dark:border-muted">
             <div className="flex justify-between items-center mb-4">
@@ -373,6 +380,7 @@ return (
                 Refresh
               </button>
             </div>
+
             {isLoading ? (
               <div className="text-center py-8">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-2 border-green-600"></div>
@@ -392,23 +400,26 @@ return (
                       </span>
                     </div>
                     <p className="text-gray-700 dark:text-muted-foreground font-medium">{job.company}</p>
+
                     <div className="flex flex-wrap gap-2 my-2">
                       <div className="flex items-center text-sm text-gray-600 dark:text-muted-foreground">
-                        <FaBriefcase className="mr-1" /> 
+                        <FaBriefcase className="mr-1" />
                         {job.job_type}
                       </div>
                       <div className="flex items-center text-sm text-gray-600 dark:text-muted-foreground">
-                        <FaMapMarkerAlt className="mr-1" /> 
+                        <FaMapMarkerAlt className="mr-1" />
                         {job.location}
                       </div>
                       <div className="flex items-center text-sm text-gray-600 dark:text-muted-foreground">
-                        <FaDollarSign className="mr-1" /> 
+                        <FaDollarSign className="mr-1" />
                         {formatSalary(job.salary)}
                       </div>
                     </div>
+
                     <p className="text-sm text-gray-600 dark:text-muted-foreground line-clamp-2 mt-1">
                       {job.description}
                     </p>
+
                     <div className="mt-3 flex flex-wrap gap-1">
                       {job.skills.slice(0, 3).map((skill, index) => (
                         <span
@@ -424,6 +435,7 @@ return (
                         </span>
                       )}
                     </div>
+
                     <div className="mt-3 flex justify-between items-center">
                       {job.verified ? (
                         <span className="text-xs text-green-600 flex items-center">
@@ -464,6 +476,7 @@ return (
                 )}
               </div>
             )}
+
             {filteredJobs.length > 0 && (
               <div className="mt-6 text-center">
                 <Link href="/jobs/browse" className="text-blue-600 hover:underline">

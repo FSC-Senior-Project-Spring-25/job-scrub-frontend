@@ -1,5 +1,5 @@
 "use client";
-
+export const unstable_runtimeJS = true;
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
