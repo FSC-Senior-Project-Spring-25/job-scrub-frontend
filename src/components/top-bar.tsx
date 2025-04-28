@@ -59,7 +59,8 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
 
-  // Add refs for dropdown menus
+  const [mounted, setMounted] = useState(false); // 👈 added
+
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
   const profilePath = user ? `/profile/${user.uid}` : "/login";
@@ -77,7 +78,10 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
     }
   };
 
-  // Handle clicks outside the profile dropdown
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -131,17 +135,23 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                 ))}
               </div>
             </div>
+
             <div className="hidden lg:block w-64 mx-4">
               <UserSearch />
             </div>
-            {/* User Actions */}
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+
+            {/* Theme toggle button */}
+            {mounted && ( // 👈 Fix hydration: don't render theme button until mounted
+              <button
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 className="ml-4 text-gray-700 dark:text-gray-300 hover:text-green-600 transition-colors"
-                 aria-label="Toggle Theme"
-      >
-                  {theme === "dark" ? "☀️" : "🌙"}
+                aria-label="Toggle Theme"
+              >
+                {theme === "dark" ? "☀️" : "🌙"}
               </button>
+            )}
+
+            {/* User Actions */}
             <div className="flex items-center">
               {loading ? (
                 <div className="flex items-center text-gray-500">
@@ -164,6 +174,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                       <FaUserCircle size={24} />
                       <span className="ml-1 hidden sm:inline">Profile</span>
                     </button>
+
                     {isProfileMenuOpen && (
                       <div
                         ref={profileMenuRef}
@@ -210,6 +221,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
             </div>
           </div>
         </nav>
+
         {/* Mobile menu */}
         {isMenuOpen && !loading && (
           <div className="lg:hidden w-full bg-white dark:bg-background shadow-lg">
@@ -218,8 +230,8 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex items-center text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors px-3 py-2 rounded"
                   onClick={toggleMenu}
+                  className="flex items-center text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-300"
                 >
                   {item.icon}
                   {item.label}
@@ -229,8 +241,8 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                 <>
                   <Link
                     href={profilePath}
-                    className="flex items-center text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors px-3 py-2 rounded"
                     onClick={toggleMenu}
+                    className="flex items-center text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-300"
                   >
                     <FaUserCircle className="mr-2" />
                     View Profile
@@ -240,7 +252,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                       handleLogout();
                       toggleMenu();
                     }}
-                    className="flex items-center w-full text-left text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors px-3 py-2 rounded"
+                    className="flex items-center w-full text-left text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-300"
                   >
                     <FaUser className="mr-2" />
                     Sign Out
@@ -250,9 +262,10 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
             </div>
           </div>
         )}
-        {/* Line between TopBar and Content */}
+
+        {/* Line between Topbar and content */}
         <div className="border-t border-gray-300 dark:border-gray-700" />
       </div>
     </>
   );
-}  
+}
