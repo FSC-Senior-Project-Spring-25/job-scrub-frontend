@@ -22,16 +22,13 @@ import {
   Briefcase,
   MapPin,
   Calendar as CalendarIcon,
-  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -53,61 +50,10 @@ import {
 import { Calendar as DateCalendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { jobReportSchema, JobReportValues } from "@/lib/schemas";
 
-const locationSchema = z
-  .object({
-    type: z.enum(["remote", "onsite", "hybrid"]),
-    address: z.string().optional(),
-    coordinates: z
-      .object({
-        lat: z.number(),
-        lon: z.number(),
-      })
-      .optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.type === "remote") return true;
-      return !!(data.address && data.coordinates);
-    },
-    {
-      message: "Location details required for non-remote positions",
-      path: ["address"],
-    }
-  );
-
-const formSchema = z.object({
-  title: z.string().min(1, {
-    message: "Job title is required.",
-  }),
-  company: z.string().min(1, {
-    message: "Company name is required.",
-  }),
-  url: z.string().url({
-    message: "Please enter a valid URL.",
-  }),
-  date: z.date({
-    required_error: "Date posted is required.",
-  }),
-  description: z.string().min(1, {
-    message: "Job description is required.",
-  }),
-  salary: z.string().optional(),
-  benefits: z.array(z.string()),
-  skills: z.array(z.string()).min(1, {
-    message: "At least one skill is required.",
-  }),
-  location: locationSchema,
-  jobType: z.enum([
-    "fulltime",
-    "parttime",
-    "contract",
-    "volunteer",
-    "internship",
-  ]),
-});
-
-type FormValues = z.infer<typeof formSchema>;
+// Replace type FormValues with the exported type
+type FormValues = JobReportValues;
 
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -144,7 +90,7 @@ export default function VerifyPage() {
   const [benefitInput, setBenefitInput] = useState("");
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(jobReportSchema),
     defaultValues: {
       title: "",
       company: "",
@@ -153,7 +99,7 @@ export default function VerifyPage() {
       description: "",
       salary: "",
       skills: [""],
-      benefits: [""],
+      benefits: [],
       location: {
         type: "onsite",
         address: "",
