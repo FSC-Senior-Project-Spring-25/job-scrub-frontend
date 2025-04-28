@@ -88,7 +88,6 @@ const displayData =
         education: [],
         experience: [],
         resume_id: null,
-        // Keep only essential fields visible
         username: userData.username,
         profileIcon: userData.profileIcon,
         isPrivate: true,
