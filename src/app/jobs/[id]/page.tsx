@@ -166,7 +166,7 @@ export default function JobDetailPage() {
               </span>
             )}
           </Link>
-          <Link href="/saved_jobs" className="flex px-3 py-2 rounded hover:bg-gray-100 items-center">
+          <Link href="/jobs/saved" className="flex px-3 py-2 rounded hover:bg-gray-100 items-center">
             <FaRegBookmark className="mr-2" /> Saved Jobs
             {savedCount > 0 && (
               <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">

@@ -25,7 +25,7 @@ export default function SavedJobsBadge() {
 
   return (
     <Link
-      href="/saved_jobs"
+      href="/jobs/saved"
       className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
     >
       <FaRegBookmark className="mr-2" />
