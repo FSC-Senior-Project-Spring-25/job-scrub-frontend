@@ -9,16 +9,17 @@ import {
   addDoc,
   onSnapshot,
   orderBy,
+  updateDoc,
+  arrayUnion,
 } from 'firebase/firestore';
 import { db } from '@/app/firebase';
 
 /**
- * Creates or returns a 1-on-1 chat between two users by email.
+ * Get or create a 1-on-1 chat between two users
  */
 export const getOrCreateChat = async (email1: string, email2: string) => {
-  const participants = [email1, email2].sort(); // ✅ Prevent duplicates by sorting
+  const participants = [email1, email2].sort();
 
-  // Query for existing chat between these users
   const chatQuery = query(
     collection(db, 'chats'),
     where('users', '==', participants)
@@ -27,22 +28,22 @@ export const getOrCreateChat = async (email1: string, email2: string) => {
   const snapshot = await getDocs(chatQuery);
 
   if (!snapshot.empty) {
-    return snapshot.docs[0].id; // Chat already exists
+    return snapshot.docs[0].id;
   }
 
-  // Create new chat
   const chatRef = doc(collection(db, 'chats'));
   await setDoc(chatRef, {
     users: participants,
     lastMessage: '',
     updatedAt: serverTimestamp(),
+    unreadBy: participants, // initially unread by both
   });
 
   return chatRef.id;
 };
 
 /**
- * Sends a new message inside a given chat
+ * Send a new message inside a chat
  */
 export const sendMessage = async (
   chatId: string,
@@ -57,18 +58,22 @@ export const sendMessage = async (
     createdAt: serverTimestamp(),
   });
 
-  // Update parent chat with last message
-  await setDoc(
-    doc(db, 'chats', chatId),
-    {
-      lastMessage: text,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
+  // Get users in the chat to set unreadBy correctly
+  const chatDoc = doc(db, 'chats', chatId);
+  const chatSnapshot = await getDocs(query(collection(db, 'chats'), where('__name__', '==', chatId)));
+  const chatData = chatSnapshot.docs[0]?.data();
+  const recipients = chatData?.users?.filter((u: string) => u !== senderEmail) || [];
+
+  await updateDoc(chatDoc, {
+    lastMessage: text,
+    updatedAt: serverTimestamp(),
+    unreadBy: arrayUnion(...recipients),
+  });
 };
 
-
+/**
+ * Listen to messages in a chat
+ */
 export const listenToMessages = (
   chatId: string,
   callback: (messages: any[]) => void
@@ -84,5 +89,19 @@ export const listenToMessages = (
       ...doc.data(),
     }));
     callback(messages);
+  });
+};
+
+/**
+ * Listen to all user chats
+ */
+export const listenToChats = (userEmail: string, callback: (chats: any[]) => void) => {
+  const q = query(collection(db, 'chats'), where('users', 'array-contains', userEmail));
+  return onSnapshot(q, (snapshot) => {
+    const chatList = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    callback(chatList);
   });
 };

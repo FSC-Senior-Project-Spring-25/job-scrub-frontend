@@ -29,7 +29,7 @@ export default function NewMessagePopup({
     .filter((data) =>
     data.email &&
     data.email !== user.email &&
-    data.isPrivate !== true // ⬅️ This filters out private users or ones who made it private
+    data.isPrivate !== true 
   ) 
     .map((data) => data.email);
     setAllUsers(emails);
@@ -46,7 +46,7 @@ export default function NewMessagePopup({
     await sendMessage(chatId, user.email, message);
 
     onCloseAction();         // Close the popup
-    onOpenChatAction(chatId); // Open the chat immediately
+    onOpenChatAction(chatId); 
   };
 
   const filteredUsers = allUsers.filter((email) =>
