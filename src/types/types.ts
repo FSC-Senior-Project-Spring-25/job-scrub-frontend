@@ -37,7 +37,7 @@ export interface Job {
   company: string;
   date: string;
   description: string;
-  job_type: string;
+  jobType: string;
   lat: number;
   location: string;
   lon: number;

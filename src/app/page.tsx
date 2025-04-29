@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   FaSearch,
-  FaRegBookmark,
-  FaRegClock,
   FaMapMarkerAlt,
   FaBriefcase,
   FaDollarSign,
@@ -17,7 +15,6 @@ import { useAuth } from "./auth-context";
 import { Job } from "@/types/types";
 import AnimatedLogo from "@/components/animated-logo";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -29,7 +26,7 @@ import { json } from "stream/consumers";
 
 export default function HomePage() {
   const [search, setSearch] = useState("");
-  const [jobs, setJobs] = useState<Record<string, Job>>({});
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { user, loading } = useAuth();
   const [userLocation, setUserLocation] = useState<{
@@ -122,92 +119,64 @@ export default function HomePage() {
     setSearch("");
     setUserLocation(null);
     setLocationError(null);
-    fetchJobs();
   };
 
-  const fetchJobs = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/job/unverified");
-      const data = await response.json();
-      setJobs(data);
-    } catch (error) {
-      console.error("Failed to fetch jobs:", error);
-      toast.error("Failed to fetch job listings");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fetch filtered jobs based on current filters
-  const fetchFilteredJobs = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/job/filtered", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          search: search || "",
-          jobType: filters.jobType,
-          locationType: filters.locationType,
-          maxDistance: filters.maxDistance,
-          datePosted: filters.datePosted,
-          userLocation,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch filtered jobs");
-      }
-      const jsonResponse = await response.json();
-      console.log(jsonResponse);
-      setJobs(jsonResponse || {});
-    } catch (error) {
-      console.error("Error filtering jobs:", error);
-      toast.error("Failed to apply filters");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const debounce = (func: Function, delay: number) => {
-    let timeoutId: NodeJS.Timeout;
-    return (...args: any[]) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => func(...args), delay);
-    };
-  };
-
-  const debouncedFetchFilteredJobs = debounce(fetchFilteredJobs, 500);
-
-  // Load initial jobs when user is available
   useEffect(() => {
     if (user) {
       fetchJobs();
     }
   }, [user]);
 
-  useEffect(() => {
-    if (user) {
-      const hasActiveFilters =
-        search ||
-        Object.values(filters.jobType).some(Boolean) ||
-        Object.values(filters.locationType).some(Boolean) ||
-        filters.maxDistance !== 50 ||
-        filters.datePosted !== "anytime";
 
-      if (hasActiveFilters) {
-        debouncedFetchFilteredJobs();
-      } else {
-        // When no filters are active, show all jobs
-        fetchJobs();
+  const fetchJobs = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/job/all?limit=3");
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch jobs: ${response.status}`);
       }
+      
+      const data = await response.json();
+      
+      // Transform the nested structure into Job objects
+      if (Array.isArray(data)) {
+        const transformedJobs: Job[] = data
+          .filter(item => item && item.id && item.metadata)
+          .map(item => {
+            const metadata = item.metadata;
+            return {
+              id: item.id,
+              title: metadata.title || '',
+              company: metadata.company || '',
+              description: metadata.description || '',
+              location: metadata.address || '',
+              jobType: metadata.jobType || metadata.locationType || '',
+              date: metadata.date || new Date().toISOString(),
+              url: metadata.url || '',
+              salary: metadata.salary || '',
+              skills: Array.isArray(metadata.skills) ? metadata.skills : [],
+              benefits: Array.isArray(metadata.benefits) ? metadata.benefits : [],
+              verified: !!metadata.verified,
+              lat: metadata.lat || 0,
+              lon: metadata.lon || 0
+            };
+          });
+        
+        setJobs(transformedJobs);
+      } else {
+        console.error("Expected array response from API");
+        setJobs([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch jobs:", error);
+      toast.error("Failed to fetch job listings");
+      setJobs([]);
+    } finally {
+      setIsLoading(false);
     }
-  }, [search, filters, userLocation, user]);
+  };
 
-  // Format salary for display
   const formatSalary = (salary: string) => {
     const salaryNum = parseInt(salary);
     if (isNaN(salaryNum)) return "Salary not specified";
@@ -229,6 +198,98 @@ export default function HomePage() {
     if (diffDays === 1) return "Yesterday";
     return `${diffDays} days ago`;
   };
+
+  const filteredJobs = Object.entries(jobs).filter(([id, job]) => {
+    if (!job || typeof job !== "object") return false;
+
+    const jobType = job.jobType?.toLowerCase() || "";
+    const jobLocation = job.location?.toLowerCase() || "";
+    const isRemote = jobLocation.includes("remote");
+    const isHybrid = jobLocation.includes("hybrid");
+    const hasCoords = job.lat && job.lon; // Check if coordinates exist
+
+    const searchLower = search.toLowerCase();
+    const matchesSearch =
+      job.title?.toLowerCase().includes(searchLower) ||
+      job.company?.toLowerCase().includes(searchLower) ||
+      job.description?.toLowerCase().includes(searchLower) ||
+      job.skills?.some((skill) => skill.toLowerCase().includes(searchLower)) ||
+      false;
+
+    const activeJobTypes = Object.entries(filters.jobType)
+      .filter(([_, checked]) => checked)
+      .map(([type]) => type);
+
+    const matchesJobType =
+      activeJobTypes.length === 0 ||
+      activeJobTypes.some((type) => {
+        if (type === "fullTime") return jobType.includes("full");
+        if (type === "partTime") return jobType.includes("part");
+        if (type === "volunteer") return jobType.includes("volunteer");
+        return jobType.includes(type.toLowerCase());
+      });
+
+    const activeLocationTypes = Object.entries(filters.locationType)
+      .filter(([_, checked]) => checked)
+      .map(([type]) => type);
+
+    const matchesLocationType =
+      activeLocationTypes.length === 0 ||
+      activeLocationTypes.some((type) => {
+        if (type === "remote") return isRemote;
+        if (type === "hybrid") return isHybrid;
+
+        return (!job.location && hasCoords) || (!isRemote && !isHybrid);
+      });
+
+    let withinDistance = true;
+    if (userLocation && hasCoords && !isRemote) {
+      try {
+        const distance = calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          job.lat,
+          job.lon
+        );
+        withinDistance = distance <= filters.maxDistance;
+      } catch {
+        withinDistance = true;
+      }
+    }
+
+    // Date filter
+    let matchesDatePosted = true;
+    if (job.date) {
+      try {
+        const now = new Date();
+        const jobDate = new Date(job.date);
+        const diffHours =
+          (now.getTime() - jobDate.getTime()) / (1000 * 60 * 60);
+
+        switch (filters.datePosted) {
+          case "24h":
+            matchesDatePosted = diffHours <= 24;
+            break;
+          case "7d":
+            matchesDatePosted = diffHours <= 168;
+            break;
+          case "30d":
+            matchesDatePosted = diffHours <= 720;
+            break;
+        }
+      } catch {
+        matchesDatePosted = true;
+      }
+    }
+
+    return (
+      matchesSearch &&
+      matchesJobType &&
+      matchesLocationType &&
+      withinDistance &&
+      matchesDatePosted
+    );
+  });
 
   if (loading) {
     return (
@@ -526,7 +587,7 @@ export default function HomePage() {
                         <div className="flex flex-wrap gap-2 my-2">
                           <div className="flex items-center text-sm text-gray-600">
                             <FaBriefcase className="mr-1" />
-                            {job.jobType || "Job type not specified"}
+                            {job.jobType}
                           </div>
                           <div className="flex items-center text-sm text-gray-600">
                             <FaMapMarkerAlt className="mr-1" />
@@ -619,7 +680,7 @@ export default function HomePage() {
               {Object.keys(jobs).length > 0 && (
                 <div className="mt-6 text-center">
                   <Link
-                    href="/jobs/browse"
+                    href="/jobs"
                     className="text-blue-600 hover:underline"
                   >
                     View All Job Listings
