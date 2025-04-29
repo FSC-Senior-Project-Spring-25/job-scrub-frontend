@@ -70,20 +70,44 @@ export default function SavedJobsPage() {
 
         if (ids.length === 0) {
           setJobs([]);
-          setLoading(false);
           return;
         }
-
-        // 🔁 Fetch job metadata
-        const response = await fetch('/api/job/unverified', {
+      
+        const response = await fetch('/api/job/fetch', {
+          method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
+          body: JSON.stringify({ ids }),
         });
-
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch jobs: ${response.status}`);
+        }
+        
         const jobMap: Record<string, Job> = await response.json();
-        const filteredJobs = ids.map(id => ({ ...jobMap[id], id })).filter(Boolean);
-        setJobs(filteredJobs);
+        const filteredJobs = ids
+        .map(id => {
+          const job = jobMap[id];
+          // Make sure all required Job fields are present
+          if (job && job.title && job.company) {
+            return {
+              id: id,
+              title: job.title || '',
+              company: job.company || '',
+              location: job.address || '',
+              workType: job.locationType || '',
+              date: job.date || '',
+              skills: job.skills || [],
+              verified: job.verified || false,
+            } as Job;
+          }
+          return null;
+        })
+        .filter((job): job is Job => job !== null);
+      
+      setJobs(filteredJobs);
       } catch (err) {
         console.error('Error loading saved jobs:', err);
       } finally {
