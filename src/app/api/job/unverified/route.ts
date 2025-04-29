@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 
 export async function GET(req: NextRequest) {
+    const limit = req.nextUrl.searchParams.get('limit') || '1000';
     try {
-        const response = await fetch(`${process.env.API_URL}/job/unverified`, {
+        const response = await fetch(`${process.env.API_URL}/job/unverified?limit=${encodeURIComponent(limit)}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -12,10 +13,10 @@ export async function GET(req: NextRequest) {
         });
         if (!response.ok) {
             const errorData = await response.json();
-            return {
-                status: response.status,
-                body: { error: errorData.detail || 'Error fetching unverified jobs' }
-            };
+            return NextResponse.json(
+                { error: errorData.detail || 'Error fetching unverified jobs' }, 
+                { status: response.status }
+            );
         }
 
         const data = await response.json();
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
             acc[job.id] = job.metadata;
             return acc;
         }, {});
-
+        console.log('Unverified jobs:', jobMap);
         return NextResponse.json(jobMap);
 
     } catch (error) {
