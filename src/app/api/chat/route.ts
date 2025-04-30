@@ -8,11 +8,11 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const message = formData.get('message') as string;
     const conversationHistory = formData.get('conversation_history') as string;
-    const files = formData.getAll('files') as File[];
-    
+    const resume = formData.get('resume') as File | null;
+
     // Get authorization token from request headers
     const authHeader = request.headers.get('authorization');
-    
+
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
@@ -21,12 +21,10 @@ export async function POST(request: NextRequest) {
     const backendFormData = new FormData();
     backendFormData.append('message', message);
     backendFormData.append('conversation_history', conversationHistory);
-    
-    // Append files if any
-    if (files && files.length > 0) {
-      files.forEach(file => {
-        backendFormData.append('files', file);
-      });
+
+    // Append resume if provided
+    if (resume) {
+      backendFormData.append('resume', resume);
     }
 
     // Headers for the backend request
@@ -46,7 +44,7 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[API] Error from backend: ${response.status}`, errorText);
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: `Backend error: ${response.status}`,
         details: errorText
       }, { status: response.status });
@@ -62,7 +60,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[API] Chat route error:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Internal server error',
       details: error instanceof Error ? error.message : String(error)
     }, { status: 500 });
