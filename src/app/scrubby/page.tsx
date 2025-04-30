@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Send, FileUp, XCircle, FileText, Bot, User, Sparkles } from "lucide-react"
 import { useAuth } from "../auth-context"
+import ReactMarkdown from "react-markdown"
 
 interface Message {
   role: "user" | "assistant"
@@ -17,13 +18,17 @@ interface Message {
     type: string
   }>
   isLoading?: boolean
+  isStreaming?: boolean
 }
 
-interface ChatResponse {
-  response: string
-  conversation: any[]
-  conversation_id: string
-  selected_agent: string
+interface StreamEventData {
+  type: "agents_selected" | "content_chunk" | "complete" | "error"
+  agents?: string[]
+  content?: string
+  response?: string
+  conversation?: any[]
+  active_agents?: string
+  error?: string
 }
 
 export default function ScrubbyChatPage() {
@@ -38,13 +43,14 @@ export default function ScrubbyChatPage() {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<string[]>([])
-  const [streamedResponse, setStreamedResponse] = useState("")
+  const [streamedContent, setStreamedContent] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, streamedResponse])
+  }, [messages, streamedContent])
 
   // Update suggestions when files change or messages reset
   useEffect(() => {
@@ -58,78 +64,15 @@ export default function ScrubbyChatPage() {
       setSuggestions([])
     }
   }, [files, messages])
-
-  // Simulate streaming text response
-  const simulateStreamingResponse = (fullResponse: string) => {
-    setIsStreaming(true)
-    setStreamedResponse("")
-
-    // Add loading message
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "assistant",
-        content: "",
-        timestamp: Date.now(),
-        isLoading: true,
-      },
-    ])
-
-    // Split the response into chunks (sentences or partial sentences)
-    // This preserves markdown structure better than splitting by words
-    const chunks = fullResponse.match(/[^.!?]+[.!?]|\S+/g) || []
-    let currentIndex = 0
-    let accumulatedContent = ""
-
-    // Function to add the next chunk
-    const addNextChunk = () => {
-      if (currentIndex < chunks.length) {
-        // Add 1-2 chunks at a time
-        const chunkSize = Math.floor(Math.random() * 2) + 1
-        const chunk = chunks.slice(currentIndex, currentIndex + chunkSize).join(" ")
-
-        accumulatedContent += (accumulatedContent ? " " : "") + chunk
-        setStreamedResponse(accumulatedContent)
-        currentIndex += chunkSize
-
-        // Update the loading message with current streamed content
-        setMessages((prev) => {
-          const newMessages = [...prev]
-          const loadingMessageIndex = newMessages.findIndex((m) => m.isLoading)
-          if (loadingMessageIndex !== -1) {
-            newMessages[loadingMessageIndex] = {
-              ...newMessages[loadingMessageIndex],
-              content: accumulatedContent,
-            }
-          }
-          return newMessages
-        })
-
-        // Slower delay between 200-400ms for a more gradual typing feel
-        const delay = Math.floor(Math.random() * 200) + 200
-        setTimeout(addNextChunk, delay)
-      } else {
-        // Streaming complete
-        setIsStreaming(false)
-
-        // Replace loading message with final message
-        setMessages((prev) => {
-          const newMessages = prev.filter((m) => !m.isLoading)
-          return [
-            ...newMessages,
-            {
-              role: "assistant",
-              content: fullResponse,
-              timestamp: Date.now(),
-            },
-          ]
-        })
+  
+  // Clean up any active stream when component unmounts
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
       }
     }
-
-    // Start streaming
-    addNextChunk()
-  }
+  }, [])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -146,21 +89,28 @@ export default function ScrubbyChatPage() {
     }
 
     setMessages((prev) => [...prev, userMessage])
-
-    // Add a "Thinking..." message immediately
+    setIsLoading(true)
+    setIsStreaming(true)
+    setStreamedContent("")
+    
+    // Add a streaming placeholder message
     setMessages((prev) => [
       ...prev,
       {
         role: "assistant",
-        content: "Thinking...",
+        content: "",
         timestamp: Date.now(),
         isLoading: true,
+        isStreaming: true,
       },
     ])
 
-    setIsLoading(true)
     const userInput = input
     setInput("")
+
+    // Create a new AbortController for this request
+    abortControllerRef.current = new AbortController()
+    const { signal } = abortControllerRef.current
 
     try {
       const formData = new FormData()
@@ -173,7 +123,7 @@ export default function ScrubbyChatPage() {
 
       const token = await user?.getIdToken()
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/message`, {
+      const response = await fetch(`/api/chat/`, {
         method: "POST",
         body: formData,
         headers: token
@@ -182,54 +132,129 @@ export default function ScrubbyChatPage() {
             }
           : {},
         credentials: "include",
+        signal,
       })
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
 
-      const data: ChatResponse = await response.json()
+      if (!response.body) {
+        throw new Error("Response body is empty")
+      }
 
-      setConversationHistory(data.conversation)
-      if (data.conversation_id) setConversationId(data.conversation_id)
-      if (data.selected_agent) setSelectedAgent(data.selected_agent)
-
-      // Remove the thinking message and add the real response
-      setMessages((prev) => {
-        // Filter out the loading message
-        const messagesWithoutLoading = prev.filter((m) => !m.isLoading)
-        return [
-          ...messagesWithoutLoading,
-          {
-            role: "assistant",
-            content: data.response,
-            timestamp: Date.now(),
-          },
-        ]
-      })
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulatedContent = ""
+      let selectedAgents: string[] = []
+      
+      // Process the stream
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        const chunk = decoder.decode(value, { stream: true })
+        const eventLines = chunk.split("\n\n")
+        
+        for (const eventLine of eventLines) {
+          if (eventLine.trim() === "" || !eventLine.startsWith("data: ")) continue
+          
+          const jsonData = eventLine.replace("data: ", "").trim()
+          if (jsonData === "[DONE]") continue
+          
+          try {
+            const data = JSON.parse(jsonData) as StreamEventData
+            
+            // Handle different event types
+            switch (data.type) {
+              case "agents_selected":
+                if (data.agents && data.agents.length > 0) {
+                  selectedAgents = data.agents
+                  setSelectedAgent(data.agents[0]) // Use first agent as primary
+                }
+                break
+                
+              case "content_chunk":
+                if (data.content) {
+                  accumulatedContent += data.content
+                  setStreamedContent(accumulatedContent)
+                  
+                  // Update the streaming message with current content
+                  setMessages((prev) => {
+                    const newMessages = [...prev]
+                    const streamingMsgIndex = newMessages.findIndex(m => m.isStreaming)
+                    if (streamingMsgIndex !== -1) {
+                      newMessages[streamingMsgIndex] = {
+                        ...newMessages[streamingMsgIndex],
+                        content: accumulatedContent,
+                      }
+                    }
+                    return newMessages
+                  })
+                }
+                break
+                
+              case "complete":
+                // Update conversation history with the full response
+                if (data.conversation) {
+                  setConversationHistory(data.conversation)
+                }
+                
+                // Set the active agent if provided
+                if (data.active_agents) {
+                  setSelectedAgent(data.active_agents.toLowerCase())
+                }
+                
+                // Replace the streaming message with the final response
+                setMessages((prev) => {
+                  const finalMessages = prev.filter(m => !m.isStreaming)
+                  return [
+                    ...finalMessages,
+                    {
+                      role: "assistant",
+                      content: data.response || accumulatedContent,
+                      timestamp: Date.now(),
+                    }
+                  ]
+                })
+                break
+                
+              case "error":
+                throw new Error(data.error || "Unknown error in stream")
+            }
+          } catch (err) {
+            console.error("Error parsing stream data:", err, jsonData)
+          }
+        }
+      }
 
       setFiles([])
     } catch (error) {
       console.error("Error:", error)
+      
+      // Remove the streaming message and add an error message
       setMessages((prev) => {
-        // Filter out the loading message
-        const messagesWithoutLoading = prev.filter((m) => !m.isLoading)
+        const finalMessages = prev.filter(m => !m.isStreaming && !m.isLoading)
         return [
-          ...messagesWithoutLoading,
+          ...finalMessages,
           {
             role: "assistant",
             content: `Error: ${error instanceof Error ? error.message : "Something went wrong"}`,
             timestamp: Date.now(),
-          },
+          }
         ]
       })
     } finally {
       setIsLoading(false)
+      setIsStreaming(false)
+      abortControllerRef.current = null
     }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files)
-      // Accept  only accept PDF files
+      // Accept only PDF files
       const pdfFiles = newFiles.filter((file) => file.type === "application/pdf")
 
       if (pdfFiles.length === 0 && newFiles.length > 0) {
@@ -266,131 +291,6 @@ export default function ScrubbyChatPage() {
         <span className="text-xs text-gray-500">{file.name}</span>
       </div>
     )
-  }
-
-  function SimpleMarkdown({ content }: { content: string }) {
-    // Split content into blocks (paragraphs, headers, lists, etc.)
-    const blocks = content.split(/\n\n+/)
-
-    return (
-      <div className="text-sm text-gray-800 w-full">
-        {blocks.map((block, blockIndex) => {
-          // Handle different heading levels
-          if (block.startsWith("# ")) {
-            return (
-              <h1 key={blockIndex} className="text-xl font-bold mt-4 mb-2 text-green-800">
-                {block.substring(2)}
-              </h1>
-            )
-          }
-
-          if (block.startsWith("## ")) {
-            return (
-              <h2 key={blockIndex} className="text-lg font-bold mt-3 mb-2 text-green-700">
-                {block.substring(3)}
-              </h2>
-            )
-          }
-
-          if (block.startsWith("### ")) {
-            return (
-              <h3 key={blockIndex} className="text-base font-semibold mt-2 mb-1 text-green-700">
-                {block.substring(4)}
-              </h3>
-            )
-          }
-
-          if (block.startsWith("#### ")) {
-            return (
-              <h4 key={blockIndex} className="text-sm font-bold mt-2 mb-1 text-green-600">
-                {block.substring(5)}
-              </h4>
-            )
-          }
-
-          // Lists
-          if (block.match(/^[*-] /m)) {
-            const items = block.split(/\n/).filter((item) => item.trim().length > 0)
-
-            return (
-              <ul key={blockIndex} className="list-disc pl-5 my-2 space-y-1">
-                {items.map((item, itemIndex) => {
-                  const itemContent = item.replace(/^[*-] /, "")
-
-                  return (
-                    <li key={itemIndex} className="text-gray-700">
-                      {formatInlineMarkdown(itemContent)}
-                    </li>
-                  )
-                })}
-              </ul>
-            )
-          }
-
-          // Regular paragraph with inline formatting
-          return (
-            <p key={blockIndex} className="my-2 whitespace-pre-wrap">
-              {formatInlineMarkdown(block)}
-            </p>
-          )
-        })}
-      </div>
-    )
-
-    // Helper function to format inline markdown
-    function formatInlineMarkdown(text: string) {
-      const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`|\[.*?\]$$.*?$$)/)
-
-      return parts.map((part, partIndex) => {
-        // Bold text
-        if (part.startsWith("**") && part.endsWith("**")) {
-          return (
-            <strong key={partIndex} className="font-bold">
-              {part.slice(2, -2)}
-            </strong>
-          )
-        }
-
-        // Italic text
-        if (part.startsWith("*") && part.endsWith("*")) {
-          return (
-            <em key={partIndex} className="italic">
-              {part.slice(1, -1)}
-            </em>
-          )
-        }
-
-        // Code
-        if (part.startsWith("`") && part.endsWith("`")) {
-          return (
-            <code key={partIndex} className="bg-gray-100 px-1 py-0.5 rounded text-red-600 font-mono text-sm">
-              {part.slice(1, -1)}
-            </code>
-          )
-        }
-
-        // Links
-        if (part.startsWith("[") && part.includes("](") && part.endsWith(")")) {
-          const linkMatch = part.match(/\[(.*?)\]$$(.*?)$$/)
-          if (linkMatch) {
-            return (
-              <a
-                key={partIndex}
-                href={linkMatch[2]}
-                className="text-blue-600 hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {linkMatch[1]}
-              </a>
-            )
-          }
-        }
-
-        // Plain text
-        return part
-      })
-    }
   }
 
   return (
@@ -447,24 +347,24 @@ export default function ScrubbyChatPage() {
                 </div>
                 {message.role === "user" ? (
                   <div className="whitespace-pre-wrap text-sm text-white">{message.content}</div>
-                ) : message.isLoading ? (
-                  <div className="whitespace-pre-wrap text-sm text-gray-800">
-                    {message.content === "Thinking..." ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 text-green-600 animate-spin" />
-                        <span className="text-sm text-green-600">Thinking...</span>
-                      </div>
-                    ) : (
-                      <div>
-                        {message.content}
-                        <div className="inline-block h-4 w-4 ml-1 align-middle">
-                          <span className="inline-flex w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
-                        </div>
-                      </div>
-                    )}
+                ) : message.isLoading && !message.content ? (
+                  <div className="whitespace-pre-wrap text-sm">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 text-green-600 animate-spin" />
+                      <span className="text-sm text-green-600">Thinking...</span>
+                    </div>
+                  </div>
+                ) : message.isStreaming ? (
+                  <div className="text-sm text-gray-800 prose prose-sm max-w-none">
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                    <div className="inline-block h-4 w-4 ml-1 align-middle">
+                      <span className="inline-flex w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
+                    </div>
                   </div>
                 ) : (
-                  <SimpleMarkdown content={message.content} />
+                  <div className="text-sm text-gray-800 prose prose-sm max-w-none">
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  </div>
                 )}
 
                 {message.files && message.files.length > 0 && (
