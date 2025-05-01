@@ -1,70 +1,108 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useRef, type FormEvent, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Send, FileUp, XCircle, FileText, Bot, User, Sparkles } from "lucide-react"
-import { useAuth } from "../auth-context"
+import { useState, useRef, type FormEvent, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Loader2,
+  Send,
+  FileUp,
+  XCircle,
+  FileText,
+  Bot,
+  User,
+  Sparkles,
+} from "lucide-react";
+import { useAuth } from "../auth-context";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
-  role: "user" | "assistant"
-  content: string
-  timestamp?: number
-  files?: Array<{
-    name: string
-    type: string
-  }>
-  isLoading?: boolean
+  role: "user" | "assistant";
+  content: string;
+  timestamp?: number;
+  resumeFile?: {
+    name: string;
+    type: string;
+  };
+  isLoading?: boolean;
+  isStreaming?: boolean;
 }
 
-interface ChatResponse {
-  response: string
-  conversation: any[]
-  conversation_id: string
-  selected_agent: string
+interface StreamEventData {
+  type: "agents_selected" | "content_chunk" | "complete" | "error";
+  agents?: string[];
+  content?: string;
+  response?: string;
+  conversation?: any[];
+  active_agents?: string;
+  error?: string;
 }
 
 export default function ScrubbyChatPage() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [files, setFiles] = useState<File[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { user } = useAuth()
-  const [conversationHistory, setConversationHistory] = useState<any[]>([])
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
-  const [conversationId, setConversationId] = useState<string | null>(null)
-  const [suggestions, setSuggestions] = useState<string[]>([])
-  const [streamedResponse, setStreamedResponse] = useState("")
-  const [isStreaming, setIsStreaming] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+  const [conversationHistory, setConversationHistory] = useState<any[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [streamedContent, setStreamedContent] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, streamedResponse])
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamedContent]);
 
-  // Update suggestions when files change or messages reset
+  // Update suggestions when resumeFile changes or messages reset
   useEffect(() => {
-    if (files.length > 0) {
+    if (resumeFile) {
       setSuggestions([
         "Can you summarize my resume?",
         "How can I improve my work experience section?",
         "What keywords are missing for my target job?",
-      ])
+      ]);
     } else {
-      setSuggestions([])
+      setSuggestions([]);
     }
-  }, [files, messages])
+  }, [resumeFile, messages]);
 
-  // Simulate streaming text response
-  const simulateStreamingResponse = (fullResponse: string) => {
-    setIsStreaming(true)
-    setStreamedResponse("")
+  // Clean up any active stream when component unmounts
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
-    // Add loading message
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() && !resumeFile) return;
+
+    const userMessage: Message = {
+      role: "user",
+      content: input,
+      timestamp: Date.now(),
+      resumeFile: resumeFile ? {
+        name: resumeFile.name,
+        type: resumeFile.type,
+      } : undefined,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+    setIsStreaming(true);
+    setStreamedContent("");
+
+    // Add a streaming placeholder message
     setMessages((prev) => [
       ...prev,
       {
@@ -72,108 +110,33 @@ export default function ScrubbyChatPage() {
         content: "",
         timestamp: Date.now(),
         isLoading: true,
+        isStreaming: true,
       },
-    ])
+    ]);
 
-    // Split the response into chunks (sentences or partial sentences)
-    // This preserves markdown structure better than splitting by words
-    const chunks = fullResponse.match(/[^.!?]+[.!?]|\S+/g) || []
-    let currentIndex = 0
-    let accumulatedContent = ""
+    const userInput = input;
+    setInput("");
 
-    // Function to add the next chunk
-    const addNextChunk = () => {
-      if (currentIndex < chunks.length) {
-        // Add 1-2 chunks at a time
-        const chunkSize = Math.floor(Math.random() * 2) + 1
-        const chunk = chunks.slice(currentIndex, currentIndex + chunkSize).join(" ")
-
-        accumulatedContent += (accumulatedContent ? " " : "") + chunk
-        setStreamedResponse(accumulatedContent)
-        currentIndex += chunkSize
-
-        // Update the loading message with current streamed content
-        setMessages((prev) => {
-          const newMessages = [...prev]
-          const loadingMessageIndex = newMessages.findIndex((m) => m.isLoading)
-          if (loadingMessageIndex !== -1) {
-            newMessages[loadingMessageIndex] = {
-              ...newMessages[loadingMessageIndex],
-              content: accumulatedContent,
-            }
-          }
-          return newMessages
-        })
-
-        // Slower delay between 200-400ms for a more gradual typing feel
-        const delay = Math.floor(Math.random() * 200) + 200
-        setTimeout(addNextChunk, delay)
-      } else {
-        // Streaming complete
-        setIsStreaming(false)
-
-        // Replace loading message with final message
-        setMessages((prev) => {
-          const newMessages = prev.filter((m) => !m.isLoading)
-          return [
-            ...newMessages,
-            {
-              role: "assistant",
-              content: fullResponse,
-              timestamp: Date.now(),
-            },
-          ]
-        })
-      }
-    }
-
-    // Start streaming
-    addNextChunk()
-  }
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() && files.length === 0) return
-
-    const userMessage: Message = {
-      role: "user",
-      content: input,
-      timestamp: Date.now(),
-      files: files.map((file) => ({
-        name: file.name,
-        type: file.type,
-      })),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-
-    // Add a "Thinking..." message immediately
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "assistant",
-        content: "Thinking...",
-        timestamp: Date.now(),
-        isLoading: true,
-      },
-    ])
-
-    setIsLoading(true)
-    const userInput = input
-    setInput("")
+    // Create a new AbortController for this request
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
 
     try {
-      const formData = new FormData()
-      formData.append("message", userInput)
-      formData.append("conversation_history", JSON.stringify(conversationHistory))
-
-      files.forEach((file) => {
-        formData.append("files", file)
-      })
-
-      const token = await user?.getIdToken()
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/message`, {
+      const formData = new FormData();
+      formData.append("message", userInput);
+      formData.append(
+        "conversation_history",
+        JSON.stringify(conversationHistory)
+      );
+    
+      // Add resume file if available
+      if (resumeFile) {
+        formData.append("resume", resumeFile);
+      }
+    
+      const token = await user?.getIdToken();
+    
+      const response = await fetch(`/api/chat/`, {
         method: "POST",
         body: formData,
         headers: token
@@ -182,58 +145,161 @@ export default function ScrubbyChatPage() {
             }
           : {},
         credentials: "include",
-      })
+        signal,
+      });
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      const data: ChatResponse = await response.json()
+      if (!response.body) {
+        throw new Error("Response body is empty");
+      }
 
-      setConversationHistory(data.conversation)
-      if (data.conversation_id) setConversationId(data.conversation_id)
-      if (data.selected_agent) setSelectedAgent(data.selected_agent)
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = "";
+      let selectedAgents: string[] = [];
 
-      // Remove the thinking message and add the real response
-      setMessages((prev) => {
-        // Filter out the loading message
-        const messagesWithoutLoading = prev.filter((m) => !m.isLoading)
-        return [
-          ...messagesWithoutLoading,
-          {
-            role: "assistant",
-            content: data.response,
-            timestamp: Date.now(),
-          },
-        ]
-      })
+      // Process the stream
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      setFiles([])
+        const chunk = decoder.decode(value, { stream: true });
+        const eventLines = chunk.split("\n\n");
+
+        for (const eventLine of eventLines) {
+          if (eventLine.trim() === "" || !eventLine.startsWith("data: "))
+            continue;
+
+          const jsonData = eventLine.replace("data: ", "").trim();
+          if (jsonData === "[DONE]") continue;
+
+          try {
+            const data = JSON.parse(jsonData) as StreamEventData;
+
+            // Handle different event types
+            switch (data.type) {
+              case "agents_selected":
+                if (data.agents && data.agents.length > 0) {
+                  selectedAgents = data.agents;
+                  setSelectedAgent(data.agents[0]); // Use first agent as primary
+                }
+                break;
+
+              case "content_chunk":
+                if (data.content) {
+                  accumulatedContent += data.content;
+                  setStreamedContent(accumulatedContent);
+
+                  // Update the streaming message with current content
+                  setMessages((prev) => {
+                    const newMessages = [...prev];
+                    const streamingMsgIndex = newMessages.findIndex(
+                      (m) => m.isStreaming
+                    );
+                    if (streamingMsgIndex !== -1) {
+                      newMessages[streamingMsgIndex] = {
+                        ...newMessages[streamingMsgIndex],
+                        content: accumulatedContent,
+                      };
+                    }
+                    return newMessages;
+                  });
+                }
+                break;
+
+              case "complete":
+                // Update conversation history with the full response
+                if (data.conversation) {
+                  setConversationHistory(data.conversation);
+                }
+
+                // Set the active agent if provided
+                if (data.active_agents) {
+                  setSelectedAgent(data.active_agents.toLowerCase());
+                }
+
+                // Replace the streaming message with the final response
+                setMessages((prev) => {
+                  const finalMessages = prev.filter((m) => !m.isStreaming);
+                  return [
+                    ...finalMessages,
+                    {
+                      role: "assistant",
+                      content: data.response || accumulatedContent,
+                      timestamp: Date.now(),
+                    },
+                  ];
+                });
+                break;
+
+              case "error":
+                // Handle server-side error without throwing
+                console.error("Server error:", data.error);
+                // Store the error in state to display to user but don't throw
+                setMessages((prev) => {
+                  const finalMessages = prev.filter((m) => !m.isStreaming);
+                  return [
+                    ...finalMessages,
+                    {
+                      role: "assistant",
+                      content: `Sorry, I couldn't process your request: ${data.error || "An unknown error occurred"}`,
+                      timestamp: Date.now(),
+                    },
+                  ];
+                });
+                
+                // Break the streaming loop after error
+                accumulatedContent = "ERROR_OCCURRED";
+                break;
+            }
+            
+            // Check if we need to break the streaming due to error
+            if (accumulatedContent === "ERROR_OCCURRED") {
+              // Exit the while loop
+              break;
+            }
+          } catch (err) {
+            console.error("Error parsing stream data:", err, jsonData);
+            // Continue processing the stream - we don't want to break on parse errors
+          }
+        }
+      }
     } catch (error) {
-      console.error("Error:", error)
+      console.error("Error:", error);
+
+      // Remove the streaming message and add an error message
       setMessages((prev) => {
-        // Filter out the loading message
-        const messagesWithoutLoading = prev.filter((m) => !m.isLoading)
+        const finalMessages = prev.filter(
+          (m) => !m.isStreaming && !m.isLoading
+        );
         return [
-          ...messagesWithoutLoading,
+          ...finalMessages,
           {
             role: "assistant",
-            content: `Error: ${error instanceof Error ? error.message : "Something went wrong"}`,
+            content: `Error: ${
+              error instanceof Error ? error.message : "Something went wrong"
+            }`,
             timestamp: Date.now(),
           },
-        ]
-      })
+        ];
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
+      setIsStreaming(false);
+      abortControllerRef.current = null;
     }
-  }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files)
-      // Accept  only accept PDF files
-      const pdfFiles = newFiles.filter((file) => file.type === "application/pdf")
+    if (e.target.files && e.target.files.length > 0) {
+      // Get just the first file
+      const file = e.target.files[0];
 
-      if (pdfFiles.length === 0 && newFiles.length > 0) {
-        // Show error if any other files were selected
+      // Check if it's a PDF
+      if (file.type !== "application/pdf") {
         setMessages((prev) => [
           ...prev,
           {
@@ -241,22 +307,25 @@ export default function ScrubbyChatPage() {
             content: "Please upload only PDF files for resumes.",
             timestamp: Date.now(),
           },
-        ])
-        return
+        ]);
+        return;
       }
 
-      // Only set PDF files
-      setFiles((prev) => [...prev, ...pdfFiles])
+      // Set the resumeFile
+      setResumeFile(file);
     }
-  }
+  };
 
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index))
-  }
+  const removeResumeFile = () => {
+    setResumeFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const triggerFileInput = () => {
-    fileInputRef.current?.click()
-  }
+    fileInputRef.current?.click();
+  };
 
   const renderFilePreview = (file: File) => {
     return (
@@ -265,133 +334,8 @@ export default function ScrubbyChatPage() {
         <span className="text-xs mt-1 text-black">PDF File</span>
         <span className="text-xs text-gray-500">{file.name}</span>
       </div>
-    )
-  }
-
-  function SimpleMarkdown({ content }: { content: string }) {
-    // Split content into blocks (paragraphs, headers, lists, etc.)
-    const blocks = content.split(/\n\n+/)
-
-    return (
-      <div className="text-sm text-gray-800 w-full">
-        {blocks.map((block, blockIndex) => {
-          // Handle different heading levels
-          if (block.startsWith("# ")) {
-            return (
-              <h1 key={blockIndex} className="text-xl font-bold mt-4 mb-2 text-green-800">
-                {block.substring(2)}
-              </h1>
-            )
-          }
-
-          if (block.startsWith("## ")) {
-            return (
-              <h2 key={blockIndex} className="text-lg font-bold mt-3 mb-2 text-green-700">
-                {block.substring(3)}
-              </h2>
-            )
-          }
-
-          if (block.startsWith("### ")) {
-            return (
-              <h3 key={blockIndex} className="text-base font-semibold mt-2 mb-1 text-green-700">
-                {block.substring(4)}
-              </h3>
-            )
-          }
-
-          if (block.startsWith("#### ")) {
-            return (
-              <h4 key={blockIndex} className="text-sm font-bold mt-2 mb-1 text-green-600">
-                {block.substring(5)}
-              </h4>
-            )
-          }
-
-          // Lists
-          if (block.match(/^[*-] /m)) {
-            const items = block.split(/\n/).filter((item) => item.trim().length > 0)
-
-            return (
-              <ul key={blockIndex} className="list-disc pl-5 my-2 space-y-1">
-                {items.map((item, itemIndex) => {
-                  const itemContent = item.replace(/^[*-] /, "")
-
-                  return (
-                    <li key={itemIndex} className="text-gray-700">
-                      {formatInlineMarkdown(itemContent)}
-                    </li>
-                  )
-                })}
-              </ul>
-            )
-          }
-
-          // Regular paragraph with inline formatting
-          return (
-            <p key={blockIndex} className="my-2 whitespace-pre-wrap">
-              {formatInlineMarkdown(block)}
-            </p>
-          )
-        })}
-      </div>
-    )
-
-    // Helper function to format inline markdown
-    function formatInlineMarkdown(text: string) {
-      const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`|\[.*?\]$$.*?$$)/)
-
-      return parts.map((part, partIndex) => {
-        // Bold text
-        if (part.startsWith("**") && part.endsWith("**")) {
-          return (
-            <strong key={partIndex} className="font-bold">
-              {part.slice(2, -2)}
-            </strong>
-          )
-        }
-
-        // Italic text
-        if (part.startsWith("*") && part.endsWith("*")) {
-          return (
-            <em key={partIndex} className="italic">
-              {part.slice(1, -1)}
-            </em>
-          )
-        }
-
-        // Code
-        if (part.startsWith("`") && part.endsWith("`")) {
-          return (
-            <code key={partIndex} className="bg-gray-100 px-1 py-0.5 rounded text-red-600 font-mono text-sm">
-              {part.slice(1, -1)}
-            </code>
-          )
-        }
-
-        // Links
-        if (part.startsWith("[") && part.includes("](") && part.endsWith(")")) {
-          const linkMatch = part.match(/\[(.*?)\]$$(.*?)$$/)
-          if (linkMatch) {
-            return (
-              <a
-                key={partIndex}
-                href={linkMatch[2]}
-                className="text-blue-600 hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {linkMatch[1]}
-              </a>
-            )
-          }
-        }
-
-        // Plain text
-        return part
-      })
-    }
-  }
+    );
+  };
 
   return (
     <div className="flex flex-col h-screen bg-white">
@@ -408,7 +352,8 @@ export default function ScrubbyChatPage() {
                 <FileText className="h-5 w-5" /> Scrubby
               </h2>
               <p className="text-sm text-gray-600 mb-4">
-                Upload your resume (PDF only) and get personalized improvement suggestions
+                Upload your resume (PDF only) and get personalized improvement
+                suggestions
               </p>
               <div className="flex items-center justify-center gap-2 text-xs text-green-700 bg-green-50 rounded-full py-1 px-3 w-fit mx-auto">
                 <Bot className="h-3 w-3" />
@@ -420,10 +365,17 @@ export default function ScrubbyChatPage() {
 
         <div className="flex-1 overflow-y-auto space-y-4">
           {messages.map((message, index) => (
-            <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              key={index}
+              className={`flex ${
+                message.role === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
               <div
                 className={`max-w-[85%] rounded-xl p-3 ${
-                  message.role === "user" ? "bg-green-700 text-white" : "bg-white border border-green-100 shadow-sm"
+                  message.role === "user"
+                    ? "bg-green-700 text-white"
+                    : "bg-white border border-green-100 shadow-sm"
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
@@ -433,11 +385,21 @@ export default function ScrubbyChatPage() {
                     <Bot className="h-4 w-4 text-green-600" />
                   )}
                   <span
-                    className={`text-xs font-medium ${message.role === "user" ? "text-green-100" : "text-green-700"}`}
+                    className={`text-xs font-medium ${
+                      message.role === "user"
+                        ? "text-green-100"
+                        : "text-green-700"
+                    }`}
                   >
                     {message.role === "user" ? "You" : "Scrubby"}
                   </span>
-                  <span className={`text-xs ${message.role === "user" ? "text-green-200" : "text-gray-500"}`}>
+                  <span
+                    className={`text-xs ${
+                      message.role === "user"
+                        ? "text-green-200"
+                        : "text-gray-500"
+                    }`}
+                  >
                     {message.timestamp &&
                       new Date(message.timestamp).toLocaleTimeString([], {
                         hour: "2-digit",
@@ -446,40 +408,34 @@ export default function ScrubbyChatPage() {
                   </span>
                 </div>
                 {message.role === "user" ? (
-                  <div className="whitespace-pre-wrap text-sm text-white">{message.content}</div>
-                ) : message.isLoading ? (
-                  <div className="whitespace-pre-wrap text-sm text-gray-800">
-                    {message.content === "Thinking..." ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 text-green-600 animate-spin" />
-                        <span className="text-sm text-green-600">Thinking...</span>
-                      </div>
-                    ) : (
-                      <div>
-                        {message.content}
-                        <div className="inline-block h-4 w-4 ml-1 align-middle">
-                          <span className="inline-flex w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
-                        </div>
+                  <div className="whitespace-pre-wrap text-sm text-white">
+                    {message.content}
+                    {message.resumeFile && (
+                      <div className="mt-2 p-1 bg-green-600 rounded flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <span className="text-xs">{message.resumeFile.name}</span>
                       </div>
                     )}
                   </div>
+                ) : message.isLoading && !message.content ? (
+                  <div className="whitespace-pre-wrap text-sm">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 text-green-600 animate-spin" />
+                      <span className="text-sm text-green-600">
+                        Thinking...
+                      </span>
+                    </div>
+                  </div>
+                ) : message.isStreaming ? (
+                  <div className="text-sm text-gray-800 prose prose-sm max-w-none">
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                    <div className="inline-block h-4 w-4 ml-1 align-middle">
+                      <span className="inline-flex w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
+                    </div>
+                  </div>
                 ) : (
-                  <SimpleMarkdown content={message.content} />
-                )}
-
-                {message.files && message.files.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    {message.files.map((file, fileIndex) => (
-                      <div key={fileIndex} className="bg-white rounded-lg border border-green-200 p-2">
-                        <div className="text-xs font-medium text-green-700 mb-1">{file.name}</div>
-                        <div className="h-40 border rounded flex items-center justify-center bg-gray-50">
-                          <div className="flex items-center justify-center h-full flex-col">
-                            <FileText className="h-10 w-10 text-red-500" />
-                            <span className="text-xs mt-1 text-black">PDF File</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="text-sm text-gray-800 prose prose-sm max-w-none">
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
                   </div>
                 )}
               </div>
@@ -490,7 +446,9 @@ export default function ScrubbyChatPage() {
 
         {suggestions.length > 0 && (
           <div className="bg-white p-3 rounded-lg border border-green-100">
-            <h3 className="text-xs font-medium text-green-700 mb-2">Try asking:</h3>
+            <h3 className="text-xs font-medium text-green-700 mb-2">
+              Try asking:
+            </h3>
             <div className="flex flex-wrap gap-2">
               {suggestions.map((suggestion, i) => (
                 <button
@@ -502,25 +460,6 @@ export default function ScrubbyChatPage() {
                 </button>
               ))}
             </div>
-          </div>
-        )}
-
-        {files.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {files.map((file, index) => (
-              <div
-                key={index}
-                className="group relative bg-white rounded-lg border border-green-200 p-2 w-full max-w-[200px]"
-              >
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs font-medium text-green-700 truncate">{file.name}</span>
-                  <button onClick={() => removeFile(index)} className="text-red-500 hover:text-red-700">
-                    <XCircle className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="h-32 border rounded bg-gray-50">{renderFilePreview(file)}</div>
-              </div>
-            ))}
           </div>
         )}
 
@@ -536,46 +475,67 @@ export default function ScrubbyChatPage() {
             disabled={isLoading || isStreaming}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                if (input.trim() || files.length > 0) {
-                  handleSubmit(e as unknown as FormEvent)
+                e.preventDefault();
+                if (input.trim() || resumeFile) {
+                  handleSubmit(e as unknown as FormEvent);
                 }
               }
             }}
           />
           <div className="flex justify-between items-center mt-2">
-            <div>
+            <div className="flex items-center gap-2">
               <input
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
                 className="hidden"
-                multiple
                 accept=".pdf,application/pdf"
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={triggerFileInput}
-                disabled={isLoading || isStreaming}
-                className="text-green-700 hover:bg-green-50"
-              >
-                <FileUp className="h-4 w-4 mr-1" />
-                <span className="text-sm font-bold">Attach PDF resume</span>
-              </Button>
+              {resumeFile ? (
+                <div className="flex items-center gap-2 bg-green-50 py-1 px-3 rounded-full">
+                  <FileText className="h-4 w-4 text-green-600" />
+                  <span className="text-xs text-green-700 truncate max-w-[150px]">
+                    {resumeFile.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={removeResumeFile}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={triggerFileInput}
+                  disabled={isLoading || isStreaming}
+                  className="text-green-700 hover:bg-green-50"
+                >
+                  <FileUp className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-bold">Attach PDF resume</span>
+                </Button>
+              )}
             </div>
 
             <Button
               type="submit"
               size="sm"
-              disabled={isLoading || isStreaming || (!input.trim() && files.length === 0)}
+              disabled={
+                isLoading ||
+                isStreaming ||
+                (!input.trim() && !resumeFile)
+              }
               className="bg-green-600 hover:bg-green-700"
             >
               {isLoading || isStreaming ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  <span className="text-sm">{isLoading ? "Processing" : "Responding..."}</span>
+                  <span className="text-sm">
+                    {isLoading ? "Processing" : "Responding..."}
+                  </span>
                 </>
               ) : (
                 <>
@@ -595,5 +555,5 @@ export default function ScrubbyChatPage() {
         )}
       </div>
     </div>
-  )
+  );
 }

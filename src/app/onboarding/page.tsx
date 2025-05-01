@@ -24,6 +24,7 @@ import { FormStep } from "@/components/onboarding/form-step"
 import { ListItem } from "@/components/onboarding/list-item"
 import FileUpload from "@/components/file-upload"
 import { personalInfoSchema, educationSchema, experienceSchema } from "@/lib/schemas"
+import { updateProfile } from "firebase/auth"
 
 export default function Onboarding() {
   const router = useRouter()
@@ -346,6 +347,10 @@ export default function Onboarding() {
         phone: values.phone || "",
         isPrivate: values.isPrivate,
       })
+
+      await updateProfile(user, {
+        displayName: values.username
+      });
 
       setUserData((prev) => ({
         ...prev,

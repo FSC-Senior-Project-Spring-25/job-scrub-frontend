@@ -9,6 +9,7 @@ import { CalendarIcon, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
+import { jobReportSchema } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -34,59 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const locationSchema = z
-  .object({
-    type: z.enum(["remote", "onsite", "hybrid"]),
-    address: z.string().optional(),
-    coordinates: z
-      .object({
-        lat: z.number(),
-        lon: z.number(),
-      })
-      .optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.type === "remote") return true;
-      return !!(data.address && data.coordinates);
-    },
-    {
-      message: "Location details required for non-remote positions",
-      path: ["address"],
-    }
-  );
-
-const formSchema = z.object({
-  title: z.string().min(1, {
-    message: "Job title is required.",
-  }),
-  company: z.string().min(1, {
-    message: "Company name is required.",
-  }),
-  url: z.string().url({
-    message: "Please enter a valid URL.",
-  }),
-  date: z.date({
-    required_error: "Date posted is required.",
-  }),
-  description: z.string().min(1, {
-    message: "Job description is required.",
-  }),
-  salary: z.string().optional(),
-  benefits: z.array(z.string()),
-  skills: z.array(z.string()).min(1, {
-    message: "At least one skill is required.",
-  }),
-  location: locationSchema,
-  jobType: z.enum([
-    "fulltime",
-    "parttime",
-    "contract",
-    "volunteer",
-    "internship",
-  ]),
-});
 
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -117,8 +65,8 @@ export default function ReportPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isValidatingLocation, setIsValidatingLocation] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<z.infer<typeof jobReportSchema>>({
+    resolver: zodResolver(jobReportSchema),
     defaultValues: {
       title: "",
       company: "",
@@ -136,7 +84,7 @@ export default function ReportPage() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  function onSubmit(values: z.infer<typeof jobReportSchema>) {
     // need to format the location field based on the type
     const formattedValues = {
       ...values,

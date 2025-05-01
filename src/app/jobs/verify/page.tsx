@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useAuth } from "../auth-context";
+import { useAuth } from "../../auth-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,6 +13,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CheckCircle,
@@ -21,17 +32,17 @@ import {
   Edit,
   Briefcase,
   MapPin,
-  Calendar as CalendarIcon,
-  Loader2,
+  CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
-import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -44,7 +55,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { JobReport } from "@/types/types";
+import type { JobReport } from "@/types/types";
 import {
   Popover,
   PopoverTrigger,
@@ -53,61 +64,9 @@ import {
 import { Calendar as DateCalendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { jobReportSchema, type JobReportValues } from "@/lib/schemas";
 
-const locationSchema = z
-  .object({
-    type: z.enum(["remote", "onsite", "hybrid"]),
-    address: z.string().optional(),
-    coordinates: z
-      .object({
-        lat: z.number(),
-        lon: z.number(),
-      })
-      .optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.type === "remote") return true;
-      return !!(data.address && data.coordinates);
-    },
-    {
-      message: "Location details required for non-remote positions",
-      path: ["address"],
-    }
-  );
-
-const formSchema = z.object({
-  title: z.string().min(1, {
-    message: "Job title is required.",
-  }),
-  company: z.string().min(1, {
-    message: "Company name is required.",
-  }),
-  url: z.string().url({
-    message: "Please enter a valid URL.",
-  }),
-  date: z.date({
-    required_error: "Date posted is required.",
-  }),
-  description: z.string().min(1, {
-    message: "Job description is required.",
-  }),
-  salary: z.string().optional(),
-  benefits: z.array(z.string()),
-  skills: z.array(z.string()).min(1, {
-    message: "At least one skill is required.",
-  }),
-  location: locationSchema,
-  jobType: z.enum([
-    "fulltime",
-    "parttime",
-    "contract",
-    "volunteer",
-    "internship",
-  ]),
-});
-
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = JobReportValues;
 
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -129,22 +88,30 @@ interface LocationSuggestion {
 }
 
 export default function VerifyPage() {
-  const [unverifiedJobs, setUnverifiedJobs] = useState<
-    Record<string, JobReport>
-  >({});
+  const [allJobs, setAllJobs] = useState<Record<string, JobReport>>({});
+  const [filteredJobs, setFilteredJobs] = useState<Record<string, JobReport>>(
+    {}
+  );
   const { user } = useAuth();
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
+  const [locationSuggestions, setLocationSuggestions] = useState<
+    LocationSuggestion[]
+  >([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isValidatingLocation, setIsValidatingLocation] = useState(false);
   const [skillInput, setSkillInput] = useState("");
   const [benefitInput, setBenefitInput] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [showVerifyDialog, setShowVerifyDialog] = useState(false);
+  const [jobToAction, setJobToAction] = useState<string | null>(null);
+  const JOBS_PER_PAGE = 3;
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(jobReportSchema),
     defaultValues: {
       title: "",
       company: "",
@@ -153,7 +120,7 @@ export default function VerifyPage() {
       description: "",
       salary: "",
       skills: [""],
-      benefits: [""],
+      benefits: [],
       location: {
         type: "onsite",
         address: "",
@@ -167,9 +134,11 @@ export default function VerifyPage() {
     try {
       const response = await fetch("/api/job/unverified");
       const data = await response.json();
-      setUnverifiedJobs(data);
 
-      // Set the first job as active if there are any jobs
+      setAllJobs(data);
+      setFilteredJobs(data);
+
+      // Set the first job as active if there are any jobs and no active job
       const jobIds = Object.keys(data);
       if (jobIds.length > 0 && !activeJobId) {
         setActiveJobId(jobIds[0]);
@@ -182,26 +151,92 @@ export default function VerifyPage() {
     }
   };
 
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+
+    if (!query.trim()) {
+      setFilteredJobs(allJobs);
+      setCurrentPage(1);
+
+      const jobIds = Object.keys(allJobs);
+      if (jobIds.length > 0) {
+        setActiveJobId(jobIds[0]);
+        updateFormWithJobData(allJobs[jobIds[0]]);
+      }
+      return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    const filtered = Object.entries(allJobs).reduce((acc, [id, job]) => {
+      if (job.title.toLowerCase().includes(lowerQuery)) {
+        acc[id] = job;
+      }
+      return acc;
+    }, {} as Record<string, JobReport>);
+
+    setFilteredJobs(filtered);
+    setCurrentPage(1);
+
+    const filteredIds = Object.keys(filtered);
+    if (filteredIds.length > 0) {
+      setActiveJobId(filteredIds[0]);
+      updateFormWithJobData(filtered[filteredIds[0]]);
+    } else {
+      setActiveJobId(null);
+    }
+  };
+
+  const totalPages = Math.ceil(
+    Object.keys(filteredJobs).length / JOBS_PER_PAGE
+  );
+
+  const getCurrentPageJobs = () => {
+    const jobIds = Object.keys(filteredJobs);
+    const startIndex = (currentPage - 1) * JOBS_PER_PAGE;
+    const endIndex = startIndex + JOBS_PER_PAGE;
+
+    return jobIds.slice(startIndex, endIndex).reduce((acc, id) => {
+      acc[id] = filteredJobs[id];
+      return acc;
+    }, {} as Record<string, JobReport>);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   const updateFormWithJobData = (job: JobReport) => {
     // Format date
     const formattedDate = job.date ? new Date(job.date) : new Date();
-  
+
     // Parse location data based on the new schema
     const locationData = {
       type: job.locationType || "onsite",
       address: "",
       coordinates: { lat: 0, lon: 0 },
     };
-  
+
     // If location exists and is not remote, set address and coordinates
-    if (job.locationType !== "remote" && typeof job.location === "object" && job.location !== null) {
+    if (
+      job.locationType !== "remote" &&
+      typeof job.location === "object" &&
+      job.location !== null
+    ) {
       locationData.address = job.location.address || "";
       locationData.coordinates = {
         lat: job.location.lat,
         lon: job.location.lon,
       };
     }
-  
+
     form.reset({
       title: job.title || "",
       company: job.company || "",
@@ -212,7 +247,12 @@ export default function VerifyPage() {
       skills: job.skills?.length ? job.skills : [""],
       benefits: job.benefits?.length ? job.benefits : [],
       location: locationData,
-      jobType: job.jobType as "fulltime" | "parttime" | "contract" | "volunteer" | "internship"
+      jobType: job.jobType as
+        | "fulltime"
+        | "parttime"
+        | "contract"
+        | "volunteer"
+        | "internship",
     });
   };
 
@@ -237,24 +277,30 @@ export default function VerifyPage() {
 
       const formData = form.getValues();
 
-    // Format the job data to match the schema
-    const jobData = {
-      ...unverifiedJobs[jobId],
-      title: formData.title,
-      company: formData.company,
-      url: formData.url,
-      date: format(formData.date, 'yyyy-MM-dd'),
-      description: formData.description,
-      salary: formData.salary || "",
-      skills: formData.skills.filter((skill) => skill.trim() !== ""),
-      benefits: formData.benefits.filter((benefit) => benefit.trim() !== ""),
-      location: {
-        type: formData.location.type,
-        address: formData.location.type === "remote" ? undefined : formData.location.address,
-        coordinates: formData.location.type === "remote" ? undefined : formData.location.coordinates,
-      },
-      jobType: formData.jobType,
-    };
+      // Format the job data to match the schema
+      const jobData = {
+        ...allJobs[jobId],
+        title: formData.title,
+        company: formData.company,
+        url: formData.url,
+        date: format(formData.date, "yyyy-MM-dd"),
+        description: formData.description,
+        salary: formData.salary || "",
+        skills: formData.skills.filter((skill) => skill.trim() !== ""),
+        benefits: formData.benefits.filter((benefit) => benefit.trim() !== ""),
+        location: {
+          type: formData.location.type,
+          address:
+            formData.location.type === "remote"
+              ? undefined
+              : formData.location.address,
+          coordinates:
+            formData.location.type === "remote"
+              ? undefined
+              : formData.location.coordinates,
+        },
+        jobType: formData.jobType,
+      };
 
       const response = await fetch(
         `/api/job/verify?jobId=${jobId}&verified=${verified}`,
@@ -264,20 +310,47 @@ export default function VerifyPage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${await user.getIdToken()}`,
           },
-          body: JSON.stringify(jobData)
+          body: JSON.stringify(jobData),
         }
       );
 
       if (response.ok) {
-        const updatedJobs = { ...unverifiedJobs };
-        delete updatedJobs[jobId];
-        setUnverifiedJobs(updatedJobs);
+        // Remove the job from both lists
+        const updatedAllJobs = { ...allJobs };
+        delete updatedAllJobs[jobId];
+        setAllJobs(updatedAllJobs);
+
+        const updatedFilteredJobs = { ...filteredJobs };
+        delete updatedFilteredJobs[jobId];
+        setFilteredJobs(updatedFilteredJobs);
 
         // Set the next job as active if there are any jobs left
-        const remainingJobIds = Object.keys(updatedJobs);
-        if (remainingJobIds.length > 0) {
-          setActiveJobId(remainingJobIds[0]);
-          updateFormWithJobData(updatedJobs[remainingJobIds[0]]);
+        const remainingJobIds = Object.keys(updatedFilteredJobs);
+        const currentPageJobs = Object.keys(getCurrentPageJobs());
+
+        if (currentPageJobs.length > 1) {
+          // If there are still jobs on this page, select the next one
+          const currentIndex = currentPageJobs.indexOf(jobId);
+          const nextJobId =
+            currentPageJobs[currentIndex + 1] ||
+            currentPageJobs[currentIndex - 1];
+          setActiveJobId(nextJobId);
+          updateFormWithJobData(updatedFilteredJobs[nextJobId]);
+        } else if (remainingJobIds.length > 0) {
+          // If this was the last job on the page but there are more jobs
+          if (currentPage > Math.ceil(remainingJobIds.length / JOBS_PER_PAGE)) {
+            // Go to the previous page if current page no longer exists
+            setCurrentPage(Math.ceil(remainingJobIds.length / JOBS_PER_PAGE));
+          }
+          // Set the first job of the current page as active
+          const newCurrentPageJobs = Object.keys(getCurrentPageJobs());
+          if (newCurrentPageJobs.length > 0) {
+            setActiveJobId(newCurrentPageJobs[0]);
+            updateFormWithJobData(updatedFilteredJobs[newCurrentPageJobs[0]]);
+          } else {
+            setActiveJobId(null);
+            form.reset();
+          }
         } else {
           setActiveJobId(null);
           form.reset();
@@ -291,11 +364,13 @@ export default function VerifyPage() {
       } else {
         throw new Error("Failed to update job");
       }
-    } catch (error: Error | any) {
+    } catch (error: any) {
       toast.error(error.message || "Failed to verify job");
     } finally {
-      setIsSubmitting(false);
-      setIsEditing(false);
+      setIsSubmitting(false)
+      setIsEditing(false)
+      setShowVerifyDialog(false)
+      setJobToAction(null)
     }
   };
 
@@ -303,11 +378,85 @@ export default function VerifyPage() {
     fetchUnverifiedJobs();
   }, []);
 
+  const rejectJob = async (jobId: string) => {
+    if (!user) {
+      toast.error("You must be logged in to reject jobs");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const response = await fetch(
+        `/api/job/delete?id=${encodeURIComponent(jobId)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${await user.getIdToken()}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        // Remove the job from both lists
+        const updatedAllJobs = { ...allJobs };
+        delete updatedAllJobs[jobId];
+        setAllJobs(updatedAllJobs);
+
+        const updatedFilteredJobs = { ...filteredJobs };
+        delete updatedFilteredJobs[jobId];
+        setFilteredJobs(updatedFilteredJobs);
+
+        // Set the next job as active if there are any jobs left
+        const remainingJobIds = Object.keys(updatedFilteredJobs);
+        const currentPageJobs = Object.keys(getCurrentPageJobs());
+
+        if (currentPageJobs.length > 1) {
+          // If there are still jobs on this page, select the next one
+          const currentIndex = currentPageJobs.indexOf(jobId);
+          const nextJobId =
+            currentPageJobs[currentIndex + 1] ||
+            currentPageJobs[currentIndex - 1];
+          setActiveJobId(nextJobId);
+          updateFormWithJobData(updatedFilteredJobs[nextJobId]);
+        } else if (remainingJobIds.length > 0) {
+          // If this was the last job on the page but there are more jobs
+          if (currentPage > Math.ceil(remainingJobIds.length / JOBS_PER_PAGE)) {
+            // Go to the previous page if current page no longer exists
+            setCurrentPage(Math.ceil(remainingJobIds.length / JOBS_PER_PAGE));
+          }
+          // Set the first job of the current page as active
+          const newCurrentPageJobs = Object.keys(getCurrentPageJobs());
+          if (newCurrentPageJobs.length > 0) {
+            setActiveJobId(newCurrentPageJobs[0]);
+            updateFormWithJobData(updatedFilteredJobs[newCurrentPageJobs[0]]);
+          } else {
+            setActiveJobId(null);
+            form.reset();
+          }
+        } else {
+          setActiveJobId(null);
+          form.reset();
+        }
+
+        toast.success("Job deleted successfully");
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to delete job");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete job");
+    } finally {
+      setIsSubmitting(false)
+      setShowRejectDialog(false)
+      setJobToAction(null)
+    }
+  };
+
   const toggleEdit = () => {
     if (isEditing) {
       // Discard changes
       if (activeJobId) {
-        updateFormWithJobData(unverifiedJobs[activeJobId]);
+        updateFormWithJobData(allJobs[activeJobId]);
       }
     }
     setIsEditing(!isEditing);
@@ -315,41 +464,43 @@ export default function VerifyPage() {
 
   const saveChanges = async () => {
     if (!activeJobId) return;
-  
+
     const valid = await form.trigger();
     if (!valid) {
       toast.error("Please fix the errors before saving changes.");
       return;
     }
-  
+
     const formData = form.getValues();
-  
+
     // Update the job in state with the new schema
     const updatedJob: JobReport = {
-      ...unverifiedJobs[activeJobId],
+      ...allJobs[activeJobId],
       title: formData.title,
       company: formData.company,
       url: formData.url,
-      date: format(formData.date, 'yyyy-MM-dd'),
+      date: format(formData.date, "yyyy-MM-dd"),
       description: formData.description,
       salary: formData.salary || null,
       skills: formData.skills.filter((skill) => skill.trim() !== ""),
-      benefits: formData.benefits.filter((benefit) => benefit.trim() !== "") || [],
-      location: formData.location.type === "remote" 
-        ? null 
-        : {
-            address: formData.location.address || "",
-            lat: formData.location.coordinates?.lat || 0,
-            lon: formData.location.coordinates?.lon || 0,
-          },
+      benefits:
+        formData.benefits.filter((benefit) => benefit.trim() !== "") || [],
+      location:
+        formData.location.type === "remote"
+          ? null
+          : {
+              address: formData.location.address || "",
+              lat: formData.location.coordinates?.lat || 0,
+              lon: formData.location.coordinates?.lon || 0,
+            },
       locationType: formData.location.type,
       jobType: formData.jobType,
     };
-    setUnverifiedJobs({
-      ...unverifiedJobs,
+    setAllJobs({
+      ...allJobs,
       [activeJobId]: updatedJob as JobReport,
     });
-  
+
     setIsEditing(false);
     toast.success("Changes saved successfully");
   };
@@ -360,69 +511,67 @@ export default function VerifyPage() {
         setLocationSuggestions([]);
         return;
       }
-  
+
       const requestId = Date.now();
       (fetchLocationSuggestions as any).lastRequestId = requestId;
-  
-      setIsValidatingLocation(true);
+
       try {
         const response = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
             query
           )}&limit=5&addressdetails=1`
         );
-  
+
         if ((fetchLocationSuggestions as any).lastRequestId !== requestId) {
           return;
         }
-  
+
         if (response.ok) {
           const data = await response.json();
           const suggestions: LocationSuggestion[] = data
             .map((item: any) => {
               // Get the most specific location name with fallbacks
-              const locationName = 
-                item.address?.city || 
-                item.address?.town || 
+              const locationName =
+                item.address?.city ||
+                item.address?.town ||
                 item.address?.village;
-      
+
               // Skip if no location name found
               if (!locationName) return null;
-      
+
               // For US addresses, use state
-              if (item.address?.country === "United States" && item.address?.state) {
+              if (
+                item.address?.country === "United States" &&
+                item.address?.state
+              ) {
                 return {
                   address: `${locationName}, ${item.address.state}`,
                   coordinates: {
-                    lat: parseFloat(item.lat),
-                    lon: parseFloat(item.lon),
-                  }
+                    lat: Number.parseFloat(item.lat),
+                    lon: Number.parseFloat(item.lon),
+                  },
                 };
               }
-              
+
               // For international addresses, use country
               if (item.address?.country) {
                 return {
                   address: `${locationName}, ${item.address.country}`,
                   coordinates: {
-                    lat: parseFloat(item.lat),
-                    lon: parseFloat(item.lon),
-                  }
+                    lat: Number.parseFloat(item.lat),
+                    lon: Number.parseFloat(item.lon),
+                  },
                 };
               }
-  
+
               return null;
             })
             .filter((item: any): item is LocationSuggestion => item !== null);
-  
+
           setLocationSuggestions(suggestions);
         }
       } catch (error) {
         console.error("Error fetching location suggestions:", error);
-      } finally {
-        if ((fetchLocationSuggestions as any).lastRequestId === requestId) {
-          setIsValidatingLocation(false);
-        }
       }
     }, 300),
     []
@@ -480,7 +629,7 @@ export default function VerifyPage() {
     );
   }
 
-  if (Object.keys(unverifiedJobs).length === 0) {
+  if (Object.keys(allJobs).length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh]">
         <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
@@ -501,11 +650,63 @@ export default function VerifyPage() {
         <h1 className="text-3xl font-bold">Job Verification</h1>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-sm">
-            {Object.keys(unverifiedJobs).length} job
-            {Object.keys(unverifiedJobs).length !== 1 ? "s" : ""} pending
+            {Object.keys(allJobs).length} job
+            {Object.keys(allJobs).length !== 1 ? "s" : ""} pending
           </Badge>
           <Button variant="outline" size="sm" onClick={fetchUnverifiedJobs}>
             Refresh
+          </Button>
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search job titles..."
+            className="pl-9"
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+        </div>
+
+        {searchQuery && Object.keys(filteredJobs).length === 0 && (
+          <div className="text-center py-8 border rounded-lg bg-muted/20 mb-4">
+            <h3 className="text-lg font-medium mb-2">No matching jobs found</h3>
+            <p className="text-muted-foreground mb-4">
+              Try a different search term or clear your search
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => handleSearch("")}
+              className="mx-auto"
+            >
+              Clear Search
+            </Button>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mb-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={goToPrevPage}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages || 1}
+          </span>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={goToNextPage}
+            disabled={currentPage >= totalPages}
+          >
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -514,8 +715,8 @@ export default function VerifyPage() {
         value={activeJobId || ""}
         onValueChange={(value) => {
           setActiveJobId(value);
-          if (unverifiedJobs[value]) {
-            updateFormWithJobData(unverifiedJobs[value]);
+          if (filteredJobs[value]) {
+            updateFormWithJobData(filteredJobs[value]);
           }
           setIsEditing(false);
         }}
@@ -523,22 +724,22 @@ export default function VerifyPage() {
       >
         <div className="mb-4">
           <TabsList className="w-full flex flex-wrap gap-2">
-            {Object.keys(unverifiedJobs).map((jobId, index) => (
+            {Object.entries(getCurrentPageJobs()).map(([jobId, job]) => (
               <TabsTrigger
                 key={jobId}
                 value={jobId}
-                className="text-sm px-3 py-2 mb-2 flex-grow flex-shrink-0 basis-[calc(50%-0.5rem)] md:basis-[calc(25%-0.75rem)] lg:basis-[calc(16.666%-0.833rem)]"
-                title={unverifiedJobs[jobId].title}
+                className="text-sm px-3 py-2 mb-2 flex-grow flex-shrink-0 basis-[calc(33.333%-0.667rem)]"
+                title={job.title}
               >
-                {unverifiedJobs[jobId].title.length > 30
-                  ? `${unverifiedJobs[jobId].title.substring(0, 15)}...`
-                  : unverifiedJobs[jobId].title}
+                {job.title.length > 30
+                  ? `${job.title.substring(0, 15)}...`
+                  : job.title}
               </TabsTrigger>
             ))}
           </TabsList>
         </div>
 
-        {Object.entries(unverifiedJobs).map(([jobId, job]) => (
+        {Object.entries(filteredJobs).map(([jobId, job]) => (
           <TabsContent key={jobId} value={jobId}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -647,57 +848,76 @@ export default function VerifyPage() {
                       {/* Only show address field if not remote */}
                       {form.watch("location.type") !== "remote" && (
                         <FormField
-                        control={form.control}
-                        name="location.address"
-                        render={({ field }) => (
-                          <FormItem className="relative">
-                            <FormLabel>Location Address</FormLabel>
-                            <FormControl>
-                              <div className="flex items-center">
-                                <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                                <Input
-                                  {...field}
-                                  placeholder="Enter city, state"
-                                  onChange={(e) => {
-                                    field.onChange(e);
-                                    fetchLocationSuggestions(e.target.value);
-                                    setShowSuggestions(true);
-                                  }}
-                                  disabled={!isEditing || isSubmitting || form.watch("location.type") === "remote"}
-                                  onBlur={() => {
-                                    field.onBlur();
-                                    setTimeout(() => setShowSuggestions(false), 200);
-                                  }}
-                                  onFocus={() => {
-                                    if (field.value && locationSuggestions.length > 0) {
+                          control={form.control}
+                          name="location.address"
+                          render={({ field }) => (
+                            <FormItem className="relative">
+                              <FormLabel>Location Address</FormLabel>
+                              <FormControl>
+                                <div className="flex items-center">
+                                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                                  <Input
+                                    {...field}
+                                    placeholder="Enter city, state"
+                                    onChange={(e) => {
+                                      field.onChange(e);
+                                      fetchLocationSuggestions(e.target.value);
                                       setShowSuggestions(true);
-                                    }
-                                  }}
-                                />
-                              </div>
-                            </FormControl>
-                            {showSuggestions && locationSuggestions.length > 0 && (
-                              <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
-                                {locationSuggestions.map((suggestion, index) => (
-                                  <div
-                                    key={index}
-                                    className="p-2 hover:bg-muted cursor-pointer"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      form.setValue("location.address", suggestion.address);
-                                      form.setValue("location.coordinates", suggestion.coordinates);
-                                      setShowSuggestions(false);
                                     }}
-                                  >
-                                    {suggestion.address}
+                                    disabled={
+                                      !isEditing ||
+                                      isSubmitting ||
+                                      form.watch("location.type") === "remote"
+                                    }
+                                    onBlur={() => {
+                                      field.onBlur();
+                                      setTimeout(
+                                        () => setShowSuggestions(false),
+                                        200
+                                      );
+                                    }}
+                                    onFocus={() => {
+                                      if (
+                                        field.value &&
+                                        locationSuggestions.length > 0
+                                      ) {
+                                        setShowSuggestions(true);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </FormControl>
+                              {showSuggestions &&
+                                locationSuggestions.length > 0 && (
+                                  <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                                    {locationSuggestions.map(
+                                      (suggestion, index) => (
+                                        <div
+                                          key={index}
+                                          className="p-2 hover:bg-muted cursor-pointer"
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            form.setValue(
+                                              "location.address",
+                                              suggestion.address
+                                            );
+                                            form.setValue(
+                                              "location.coordinates",
+                                              suggestion.coordinates
+                                            );
+                                            setShowSuggestions(false);
+                                          }}
+                                        >
+                                          {suggestion.address}
+                                        </div>
+                                      )
+                                    )}
                                   </div>
-                                ))}
-                              </div>
-                            )}
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                                )}
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       )}
 
                       {/* Date Field */}
@@ -984,24 +1204,93 @@ export default function VerifyPage() {
                   </Button>
                 ) : (
                   <>
-                    <Button
-                      variant="destructive"
-                      onClick={() => verifyJob(jobId, false)}
-                      disabled={isSubmitting}
-                      className="flex items-center"
+                    <AlertDialog
+                      open={showRejectDialog}
+                      onOpenChange={setShowRejectDialog}
                     >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      {isSubmitting ? "Processing..." : "Reject Job"}
-                    </Button>
-                    <Button
-                      variant="default"
-                      onClick={() => verifyJob(jobId, true)}
-                      disabled={isSubmitting}
-                      className="flex items-center"
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          onClick={() => {
+                            setJobToAction(jobId);
+                            setShowRejectDialog(true);
+                          }}
+                          disabled={isSubmitting}
+                          className="flex items-center"
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          {isSubmitting ? "Processing..." : "Reject Job"}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            Are you sure you want to reject this job?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action will permanently delete the job listing
+                            and cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => {
+                              if (jobToAction) {
+                                rejectJob(jobToAction);
+                              }
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Reject
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+
+                    <AlertDialog
+                      open={showVerifyDialog}
+                      onOpenChange={setShowVerifyDialog}
                     >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      {isSubmitting ? "Processing..." : "Verify & Publish"}
-                    </Button>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="default"
+                          onClick={() => {
+                            setJobToAction(jobId);
+                            setShowVerifyDialog(true);
+                          }}
+                          disabled={isSubmitting}
+                          className="flex items-center"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          {isSubmitting ? "Processing..." : "Verify & Publish"}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            Verify and publish this job?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will mark the job as verified and make it
+                            publicly available on the platform.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => {
+                              if (jobToAction) {
+                                verifyJob(jobToAction, true);
+                              }
+                            }}
+                            className="bg-green-600 text-white hover:bg-green-700"
+                          >
+                            Verify & Publish
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </>
                 )}
               </CardFooter>

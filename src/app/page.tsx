@@ -4,243 +4,337 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   FaSearch,
-  FaRegBookmark,
-  FaRegClock,
-  FaMapMarkerAlt,
   FaBriefcase,
-  FaDollarSign,
-  FaFilter,
-  FaLocationArrow,
+  FaRegClock,
+  FaRegBookmark,
 } from "react-icons/fa";
 import { toast } from "sonner";
 import { useAuth } from "./auth-context";
-import { Job } from "@/types/types";
 import AnimatedLogo from "@/components/animated-logo";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Slider } from "@/components/ui/slider";
+import ChatPopup from "@/components/messages/chat-popup";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/app/firebase";
+import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { json } from "stream/consumers";
+  Heart,
+  MessageSquare,
+  Plus,
+  Send,
+  User,
+  ArrowRight,
+  ShieldCheck,
+} from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import ReactMarkdown from "react-markdown";
+
+interface Comment {
+  id: string;
+  author: string;
+  author_uid: string;
+  text: string;
+  created_at: string;
+}
+
+interface Post {
+  id: string;
+  author: string;
+  author_uid: string;
+  content: string;
+  created_at: string;
+  likes: number;
+  comments: Comment[];
+  userHasLiked?: boolean;
+  profileIcon?: string;
+}
 
 export default function HomePage() {
   const [search, setSearch] = useState("");
-  const [jobs, setJobs] = useState<Record<string, Job>>({});
-  const [isLoading, setIsLoading] = useState(false);
   const { user, loading } = useAuth();
-  const [userLocation, setUserLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [filters, setFilters] = useState({
-    jobType: {
-      internship: false,
-      fullTime: false,
-      partTime: false,
-      contract: false,
-      volunteer: false,
-    },
-    locationType: {
-      remote: false,
-      hybrid: false,
-      onsite: false,
-    },
-    maxDistance: 50, // in miles
-    datePosted: "anytime",
-  });
+  const router = useRouter();
 
-  // Calculate distance between two coordinates
-  const calculateDistance = (
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number
-  ) => {
-    const R = 3958.8; // earth radius in miles
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
+  const [newPostContent, setNewPostContent] = useState("");
+  const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>(
+    {}
+  );
+  const [showComments, setShowComments] = useState<Record<string, boolean>>({});
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [userProfileData, setUserProfileData] = useState<any>(null);
+
+  const navigateToProfile = (uid: string) => {
+    const encodedId = encodeURIComponent(uid);
+    router.push(`/profile/${encodedId}`);
   };
 
-  // Get user's current location
-  const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      setIsLoading(true);
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-          setLocationError(null);
-          toast.success("Location obtained successfully");
-          setIsLoading(false);
-        },
-        (error) => {
-          setLocationError("Could not get your location");
-          toast.error("Location access denied");
-          setIsLoading(false);
-        },
-        { timeout: 10000 }
-      );
-    } else {
-      setLocationError("Geolocation not supported");
-      toast.error("Browser doesn't support geolocation");
-    }
-  };
+  // Fetch posts from the Connect page
+  const fetchPosts = async () => {
+    if (!user) return;
 
-  // Reset all filters and fetch all jobs
-  const resetFilters = () => {
-    setFilters({
-      jobType: {
-        internship: false,
-        fullTime: false,
-        partTime: false,
-        contract: false,
-        volunteer: false,
-      },
-      locationType: {
-        remote: false,
-        hybrid: false,
-        onsite: false,
-      },
-      maxDistance: 50,
-      datePosted: "anytime",
-    });
-    setSearch("");
-    setUserLocation(null);
-    setLocationError(null);
-    fetchJobs();
-  };
-
-  const fetchJobs = async () => {
-    setIsLoading(true);
     try {
-      const response = await fetch("/api/job/unverified");
-      const data = await response.json();
-      setJobs(data);
-    } catch (error) {
-      console.error("Failed to fetch jobs:", error);
-      toast.error("Failed to fetch job listings");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fetch filtered jobs based on current filters
-  const fetchFilteredJobs = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/job/filtered", {
-        method: "POST",
+      setPostsLoading(true);
+      const token = await user.getIdToken();
+      const response = await fetch("/api/posts", {
         headers: {
-          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          search: search || "",
-          jobType: filters.jobType,
-          locationType: filters.locationType,
-          maxDistance: filters.maxDistance,
-          datePosted: filters.datePosted,
-          userLocation,
-        }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch filtered jobs");
-      }
-      const jsonResponse = await response.json();
-      console.log(jsonResponse);
-      setJobs(jsonResponse || {});
+      if (!response.ok) throw new Error("Failed to fetch posts");
+
+      const data = await response.json();
+
+      const postsWithIcons = await Promise.all(
+        data.map(async (post: Post) => {
+          try {
+            const docSnap = await getDoc(doc(db, "users", post.author_uid));
+            const userData = docSnap.exists() ? docSnap.data() : null;
+            return { ...post, profileIcon: userData?.profileIcon || null };
+          } catch {
+            return { ...post, profileIcon: null };
+          }
+        })
+      );
+
+      setPosts(postsWithIcons);
     } catch (error) {
-      console.error("Error filtering jobs:", error);
-      toast.error("Failed to apply filters");
+      console.error("Error fetching posts:", error);
     } finally {
-      setIsLoading(false);
+      setPostsLoading(false);
     }
   };
 
-  const debounce = (func: Function, delay: number) => {
-    let timeoutId: NodeJS.Timeout;
-    return (...args: any[]) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => func(...args), delay);
-    };
+  const fetchFollowStats = async () => {
+    if (!user?.uid) return;
+    try {
+      const token = await user.getIdToken();
+      const [followersRes, followingRes] = await Promise.all([
+        fetch(`/api/users/followers?uid=${encodeURIComponent(user.uid)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`/api/users/following?uid=${encodeURIComponent(user.uid)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      if (followersRes.ok) {
+        const followersData = await followersRes.json();
+        setFollowersCount(followersData.followers?.length || 0);
+      }
+      if (followingRes.ok) {
+        const followingData = await followingRes.json();
+        setFollowingCount(followingData.following?.length || 0);
+      }
+    } catch (err) {
+      console.error("Error fetching follow stats:", err);
+    }
   };
 
-  const debouncedFetchFilteredJobs = debounce(fetchFilteredJobs, 500);
+  const fetchUserProfileData = async () => {
+    if (!user?.uid) return;
+    try {
+      const docRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) setUserProfileData(docSnap.data());
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+    }
+  };
 
-  // Load initial jobs when user is available
   useEffect(() => {
     if (user) {
-      fetchJobs();
+      fetchPosts();
+      fetchFollowStats();
+      fetchUserProfileData();
     }
   }, [user]);
 
   useEffect(() => {
-    if (user) {
-      const hasActiveFilters =
-        search ||
-        Object.values(filters.jobType).some(Boolean) ||
-        Object.values(filters.locationType).some(Boolean) ||
-        filters.maxDistance !== 50 ||
-        filters.datePosted !== "anytime";
+    if (!user) return;
+    const intervalId = setInterval(() => fetchPosts(), 5 * 60000);
+    return () => clearInterval(intervalId);
+  }, [user]);
 
-      if (hasActiveFilters) {
-        debouncedFetchFilteredJobs();
-      } else {
-        // When no filters are active, show all jobs
-        fetchJobs();
+  async function toggleLike(postId: string) {
+    if (!user) return;
+    try {
+      // Optimistic update
+      setPosts((currentPosts) =>
+        currentPosts.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                likes: post.userHasLiked ? post.likes - 1 : post.likes + 1,
+                userHasLiked: !post.userHasLiked,
+              }
+            : post
+        )
+      );
+
+      const token = await user.getIdToken();
+      const response = await fetch(
+        `/api/posts/like?postId=${encodeURIComponent(postId)}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      // Only refetch on error
+      if (!response.ok) {
+        throw new Error("Failed to toggle like");
       }
+    } catch (err) {
+      console.error("Error toggling like:", err);
+      // Only fetch posts on error to revert the optimistic update
+      fetchPosts();
     }
-  }, [search, filters, userLocation, user]);
+  }
 
-  // Format salary for display
-  const formatSalary = (salary: string) => {
-    const salaryNum = parseInt(salary);
-    if (isNaN(salaryNum)) return "Salary not specified";
+  async function handleAddPost() {
+    if (!user || !newPostContent.trim()) return;
 
-    if (salaryNum >= 1000) {
-      return `$${(salaryNum / 1000).toFixed(0)}k`;
+    const tempId = `temp-${Date.now()}`;
+    const newPost = {
+      id: tempId,
+      author: user.displayName || user.email || "Anonymous",
+      author_uid: user.uid,
+      content: newPostContent,
+      created_at: new Date().toISOString(),
+      likes: 0,
+      comments: [],
+      userHasLiked: false,
+      profileIcon:
+        userProfileData?.profileIcon ||
+        user.displayName?.charAt(0).toUpperCase() ||
+        user.email?.charAt(0).toUpperCase() ||
+        "U",
+    };
+
+    // Optimistic update
+    setPosts((currentPosts) => [newPost, ...currentPosts]);
+    setNewPostContent("");
+    console.log("User Name:", user.displayName);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          author: user.displayName || user.email || "Anonymous",
+          content: newPost.content,
+          created_at: newPost.created_at,
+        }),
+      });
+
+      if (!response.ok) {
+        // Remove the temp post on failure
+        setPosts((currentPosts) =>
+          currentPosts.filter((post) => post.id !== tempId)
+        );
+        throw new Error("Failed to create post");
+      }
+
+      const result = await response.json();
+      // Just update the ID and any server-generated fields
+      setPosts((currentPosts) =>
+        currentPosts.map((post) =>
+          post.id === tempId ? { ...post, id: result.id } : post
+        )
+      );
+    } catch (error) {
+      console.error("Error creating post:", error);
+      toast.error("Failed to create post. Please try again.");
     }
-    return `$${salaryNum}`;
+  }
+
+  const toggleCommentSection = (postId: string) => {
+    setShowComments((prev) => ({
+      ...prev,
+      [postId]: !prev[postId],
+    }));
   };
 
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    const jobDate = new Date(dateString);
-    const today = new Date();
-    const diffTime = Math.abs(today.getTime() - jobDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Yesterday";
-    return `${diffDays} days ago`;
+  const handleCommentInputChange = (postId: string, value: string) => {
+    setCommentInputs((prev) => ({ ...prev, [postId]: value }));
   };
 
-  // Filter jobs based on search
-const filteredJobs = Object.entries(jobs).filter(([id, job]) => {
-  if (!job || typeof job !== 'object') return false;
-  const searchLower = search.toLowerCase();
-  return (
-    job.title.toLowerCase().includes(searchLower) ||
-    job.company.toLowerCase().includes(searchLower) ||
-    job.description.toLowerCase().includes(searchLower) ||
-    job.skills.some((skill) => skill.toLowerCase().includes(searchLower))
-  );
-});
+  async function submitComment(postId: string) {
+    if (!user) return;
+    const commentText = commentInputs[postId]?.trim();
+    if (!commentText) return;
+
+    try {
+      const token = await user.getIdToken();
+      const newComment = {
+        id: "temp-" + Date.now(),
+        author: user.displayName || user.email || "Anonymous",
+        author_uid: user.uid,
+        text: commentText,
+        created_at: new Date().toISOString(),
+      };
+
+      // Optimistic update
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post.id === postId
+            ? { ...post, comments: [newComment, ...post.comments] }
+            : post
+        )
+      );
+      setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
+
+      const response = await fetch(
+        `/api/posts/comment?postId=${encodeURIComponent(postId)}`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            text: commentText,
+            author: user.displayName || user.email || "Anonymous",
+          }),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Only update the specific comment with the server response if needed
+      if (response.ok) {
+        const data = await response.json();
+        if (data.id) {
+          // Update just this one comment with the real ID from the server
+          setPosts((prevPosts) =>
+            prevPosts.map((post) => {
+              if (post.id !== postId) return post;
+
+              // Find and update the temporary comment with real data
+              const updatedComments = post.comments.map((comment) =>
+                comment.id === newComment.id
+                  ? { ...comment, id: data.id }
+                  : comment
+              );
+
+              return { ...post, comments: updatedComments };
+            })
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      // Only fetch posts on error to revert the optimistic update
+      fetchPosts();
+    }
+  }
 
   if (loading) {
     return (
@@ -316,189 +410,301 @@ if (!user) {
   );
 }
 
-   // If user is logged in, show the dashboard/main application
- return (
-  <div className="min-h-screen bg-gray-100 flex flex-col">
-    {/* Main content */}
-    <main className="flex-1 container mx-auto px-4 py-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Sidebar */}
-        <div className="md:col-span-1">
-          <div className="bg-white rounded-lg shadow p-4">
-            <h2 className="font-semibold text-lg mb-4">Quick Links</h2>
-            <nav className="space-y-2">
-            <ApplicationBadge />
-            <SavedJobsBadge />
-              {/*<Link
-                href="/applications"
-                className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
-              >
-                <FaRegClock className="mr-2" /> My Job Applications
-              </Link>8 
-              */}
-            </nav>
-          </div>
-        </div>
-        {/* Main content area */}
-        <div className="md:col-span-2">
-          {/* Search Bar */}
-          <div className="bg-white rounded-lg shadow p-4 mb-6">
-            <h2 className="text-lg font-semibold mb-3">
-              Find Your Next Opportunity
-            </h2>
-            <div className="flex items-center">
-              <div className="flex-1 flex items-center border border-gray-300 rounded-lg bg-white px-4 py-2">
-                <FaSearch className="text-gray-500" />
-                <input
-                  type="text"
-                  placeholder="Search for job titles, companies, or keywords"
-                  className="ml-2 flex-1 outline-none"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              <button
-                className="ml-3 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                onClick={() =>
-                  filteredJobs.length > 0
-                    ? null
-                    : toast.error("No matching jobs found")
-                }
-              >
-                Search
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-3">
-              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
-                Remote
-              </button>
-              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
-                Full-time
-              </button>
-              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
-                Part-time
-              </button>
-              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
-                Tech
-              </button>
-            </div>
-          </div>
-          {/* Job Listings */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Job Listings</h2>
-              <button
-                onClick={fetchJobs}
-                className="text-sm text-green-600 hover:text-green-700"
-              >
-                Refresh
-              </button>
-            </div>
-            {isLoading ? (
-              <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-600"></div>
-                <p className="mt-2 text-gray-600">Loading jobs...</p>
-              </div>
-            ) : filteredJobs.length > 0 ? (
-              <div className="space-y-4">
-                {filteredJobs.map(([jobId, job]) => (
-                  <div
-                    key={jobId}
-                    className="border rounded-lg p-4 hover:shadow-md transition"
-                  >
-                    <div className="flex justify-between">
-                      <h3 className="font-medium text-lg">{job.title}</h3>
-                      <span className="text-sm text-gray-500">
-                        {formatDate(job.date)}
-                      </span>
-                    </div>
-                    <p className="text-gray-700 font-medium">{job.company}</p>
-                    <div className="flex flex-wrap gap-2 my-2">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <FaBriefcase className="mr-1" />
-                        {job.job_type}
-                      </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <FaMapMarkerAlt className="mr-1" />
-                        {job.location}
-                      </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <FaDollarSign className="mr-1" />
-                        {formatSalary(job.salary)}
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600 line-clamp-2 mt-1">
-                      {job.description}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      {job.skills.slice(0, 3).map((skill, index) => (
-                        <span
-                          key={index}
-                          className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded"
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                      {job.skills.length > 3 && (
-                        <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                          +{job.skills.length - 3} more
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-3 flex justify-between items-center">
-                      {job.verified ? (
-                        <span className="text-xs text-green-600 flex items-center">
-                          ✓ Verified listing
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-500 flex items-center">
-                          Pending verification
-                        </span>
-                      )}
-                      <div className="flex space-x-2">
-                        <button className="text-sm text-blue-600 hover:underline">
-                          Save
-                        </button>
-                        <Link
-                          href={`/jobs/${jobId}`}
-                          className="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-                        >
-                          View Details
-                        </Link>
-                      </div>
-                    </div>
+  return (
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <main className="flex-1 container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Left Sidebar / Profile Card */}
+          <div className="md:col-span-1">
+            <div className="bg-white rounded-lg shadow p-6 mb-4">
+              <div className="flex flex-col items-center">
+                <div
+                  className="w-24 h-24 bg-gradient-to-br from-green-100 bg-gray-100 rounded-full shadow-lg flex items-center justify-center text-5xl text-black cursor-pointer"
+                  onClick={() => navigateToProfile(user.uid)}
+                >
+                  {userProfileData?.profileIcon
+                    ? userProfileData.profileIcon
+                    : user.displayName?.charAt(0).toUpperCase() ||
+                      user.email?.charAt(0).toUpperCase() ||
+                      "U"}
+                </div>
+                <p
+                  className="font-semibold mt-3 cursor-pointer hover:text-green-600 transition"
+                  onClick={() => navigateToProfile(user.uid)}
+                >
+                  {user.displayName || user.email || "User"}
+                </p>
+
+                <p className="text-sm mt-1 text-gray-500">
+                  Member since:{" "}
+                  {format(
+                    new Date(user.metadata?.creationTime || Date.now()),
+                    "yyyy"
+                  )}
+                </p>
+                <div className="flex justify-center space-x-4 mt-2 text-sm text-gray-600">
+                  <div>
+                    <strong>{followersCount}</strong> followers
                   </div>
-                ))}
+                  <div>
+                    <strong>{followingCount}</strong> following
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Links Section */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <h2 className="font-semibold text-lg mb-3">Quick Links</h2>
+                <nav className="space-y-2">
+                  <Link
+                    href="/jobs"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                  >
+                    <FaBriefcase className="mr-2 text-green-600" /> Find Jobs
+                  </Link>
+                  <Link
+                    href="/jobs/report"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                  >
+                    <Plus className="mr-2 text-green-600 h-4 w-4" /> Report Job
+                  </Link>
+                  <Link
+                    href="/jobs/verify"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                  >
+                    <ShieldCheck className="mr-2 text-green-600 h-4 w-4" />{" "}
+                    Verify Jobs
+                  </Link>
+                  <Link
+                    href="/scrubby"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                  >
+                    <User className="mr-2 text-green-600 h-4 w-4" /> Resume Help
+                  </Link>
+                  <Link
+                    href="/applications"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                  >
+                    <FaRegClock className="mr-2 text-green-600" /> My
+                    Applications
+                  </Link>
+                  <Link
+                    href="/saved"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                  >
+                    <FaRegBookmark className="mr-2 text-green-600" /> Saved Jobs
+                  </Link>
+                </nav>
+              </div>
+            </div>
+
+            {/* Job Search Card */}
+            <div className="bg-white rounded-lg shadow p-4 mb-4">
+              <h2 className="font-semibold text-lg mb-3">Find Jobs</h2>
+              <div className="flex items-center">
+                <div className="flex-1 flex items-center border border-gray-300 rounded-lg bg-white px-4 py-2">
+                  <FaSearch className="text-gray-500" />
+                  <input
+                    type="text"
+                    placeholder="Search for jobs..."
+                    className="ml-2 flex-1 outline-none"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && search.trim()) {
+                        router.push(
+                          `/jobs?search=${encodeURIComponent(search.trim())}`
+                        );
+                      }
+                    }}
+                  />
+                </div>
+                <Button
+                  className="ml-2 bg-green-600 hover:bg-green-700"
+                  onClick={() => {
+                    if (search.trim()) {
+                      router.push(
+                        `/jobs?search=${encodeURIComponent(search.trim())}`
+                      );
+                    } else {
+                      router.push("/jobs");
+                    }
+                  }}
+                >
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full mt-3 text-green-700 border-green-200"
+                onClick={() => router.push("/jobs")}
+              >
+                View All Jobs
+              </Button>
+            </div>
+          </div>
+
+          {/* Main Content - Social Feed (from Connect page) */}
+          <div className="md:col-span-2 space-y-6">
+            {/* Create Post Card */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-800">
+                What's on your mind?
+              </h2>
+              <textarea
+                className="w-full mt-3 p-3 rounded-lg border border-gray-300 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 transition"
+                rows={3}
+                value={newPostContent}
+                onChange={(e) => setNewPostContent(e.target.value)}
+                placeholder="Share your thoughts..."
+                onKeyDown={(e) =>
+                  e.key === "Enter" && e.ctrlKey && handleAddPost()
+                }
+              />
+              <Button
+                className="w-full mt-4 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white"
+                onClick={handleAddPost}
+                disabled={!newPostContent.trim()}
+              >
+                <Plus className="w-4 h-4" /> Add Post
+              </Button>
+            </div>
+
+            {postsLoading ? (
+              <div className="text-center py-10">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-600"></div>
+                <p className="mt-2 text-gray-600">Loading posts...</p>
+              </div>
+            ) : posts.length === 0 ? (
+              <div className="text-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
+                <p className="text-gray-400 py-8 text-lg italic">
+                  No posts yet. Be the first to share something inspiring!
+                </p>
               </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-lg text-gray-600">
-                  No jobs found{search ? " matching your search" : ""}.
-                </p>
-                {search && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="mt-2 text-green-600 hover:underline"
-                  >
-                    Clear search
-                  </button>
-                )}
-              </div>
-            )}
-            {filteredJobs.length > 0 && (
-              <div className="mt-6 text-center">
-                <Link
-                  href="/jobs/browse"
-                  className="text-blue-600 hover:underline"
+              posts.map((post) => (
+                <Card
+                  key={post.id}
+                  className="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow bg-white"
                 >
-                  View All Job Listings
-                </Link>
-              </div>
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div
+                        className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl font-bold text-black cursor-pointer"
+                        onClick={() => navigateToProfile(post.author_uid)}
+                      >
+                        {post.profileIcon || post.author.charAt(0)}
+                      </div>
+                      <div>
+                        <p
+                          className="font-semibold cursor-pointer hover:text-green-600 transition-colors"
+                          onClick={() => navigateToProfile(post.author_uid)}
+                        >
+                          {post.author}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {format(new Date(post.created_at), "PPP")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-gray-800 mt-4 text-sm leading-relaxed whitespace-pre-wrap">
+                      <ReactMarkdown>{post.content}</ReactMarkdown>
+                    </div>
+                    <div className="flex items-center gap-4 mt-4">
+                      <Button
+                        variant={post.userHasLiked ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => toggleLike(post.id)}
+                        className={
+                          post.userHasLiked
+                            ? "bg-pink-100 text-pink-500 hover:bg-pink-200"
+                            : ""
+                        }
+                      >
+                        <Heart
+                          className={`w-4 h-4 mr-1 ${
+                            post.userHasLiked ? "fill-pink-500" : ""
+                          }`}
+                        />
+                        {post.likes || 0}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleCommentSection(post.id)}
+                      >
+                        <MessageSquare className="w-4 h-4 mr-1" />
+                        {post.comments?.length || 0}
+                      </Button>
+                    </div>
+
+                    {showComments[post.id] && (
+                      <div className="mt-4 border-t pt-3">
+                        <div className="flex gap-2 mb-3">
+                          <input
+                            type="text"
+                            placeholder="Write a comment..."
+                            className="flex-grow p-2 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-green-400 transition-all"
+                            value={commentInputs[post.id] || ""}
+                            onChange={(e) =>
+                              handleCommentInputChange(post.id, e.target.value)
+                            }
+                            onKeyDown={(e) =>
+                              e.key === "Enter" && submitComment(post.id)
+                            }
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => submitComment(post.id)}
+                            disabled={!commentInputs[post.id]?.trim()}
+                          >
+                            <Send className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        {post.comments && post.comments.length > 0 ? (
+                          post.comments.map((comment, idx) => (
+                            <div
+                              key={comment.id || idx}
+                              className="border-b last:border-0 py-2"
+                            >
+                              <div className="flex justify-between items-center">
+                                <p
+                                  className="text-sm font-medium cursor-pointer hover:text-green-600 transition"
+                                  onClick={() =>
+                                    navigateToProfile(comment.author_uid)
+                                  }
+                                >
+                                  {comment.author}
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  {format(
+                                    new Date(comment.created_at),
+                                    "MMM d, h:mm a"
+                                  )}
+                                </p>
+                              </div>
+                              <p className="text-sm mt-1 text-gray-800">
+                                {comment.text}
+                              </p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500">
+                            No comments yet. Be the first to comment!
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
             )}
           </div>
         </div>
-      </div>
-    </main>
-  </div>
-);
+      </main>
+
+      {/* Chat Popup */}
+      <ChatPopup />
+    </div>
+  );
 }

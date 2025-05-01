@@ -30,14 +30,9 @@ interface TopBarProps {
 
 const defaultNavItems: NavItem[] = [
   {
-    href: "/report",
-    label: "Report a Job",
+    href: "/jobs",
+    label: "Jobs",
     icon: <FaBriefcase className="mr-2" />,
-  },
-  {
-    href: "/verify",
-    label: "Verify",
-    icon: <FaCheckCircle className="mr-2" />,
   },
   {
     href: "/match",
@@ -49,7 +44,6 @@ const defaultNavItems: NavItem[] = [
     label: "Scrubby",
     icon: <FaRegFileAlt className="mr-2" />,
   },
-  { href: "/connect", label: "Connect", icon: <FaUser className="mr-2" /> },
 ];
 
 export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
