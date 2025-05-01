@@ -1,5 +1,4 @@
 "use client";
-export const unstable_runtimeJS = true;
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
@@ -10,13 +9,14 @@ import {
   FaBriefcase,
   FaRegFileAlt,
   FaUserCircle,
-  FaCheckCircle,
 } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/auth-context";
 import { toast } from "sonner";
 import UserSearch from "@/components/UserSearch";
 import { useTheme } from "next-themes";
+import { Moon, Sun } from "lucide-react";
+import { Switch } from "./ui/switch";
 
 interface NavItem {
   href: string;
@@ -64,9 +64,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
 
   const handleLogout = async () => {
     const result = await logout();
-    if (result.success) {
-      router.push("/login");
-    } else {
+    if (!result.success) {
       console.error("Logout failed:", result.error);
       toast.error("Failed to sign out. Please try again.");
     }
@@ -134,19 +132,24 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
               <UserSearch />
             </div>
 
-            {/* Theme toggle button */}
-            {mounted && ( // 👈 Fix hydration: don't render theme button until mounted
-              <button
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className="ml-4 text-gray-700 dark:text-gray-300 hover:text-green-600 transition-colors"
-                aria-label="Toggle Theme"
-              >
-                {theme === "dark" ? "☀️" : "🌙"}
-              </button>
-            )}
-
             {/* User Actions */}
             <div className="flex items-center">
+              {/* Theme toggle switch */}
+              {mounted && (
+                <div className="flex items-center mr-8">
+                  <Moon className="mr-2 h-6 w-6 text-gray-500 dark:text-gray-400" />
+                  <Switch
+                    checked={theme === "dark"}
+                    onCheckedChange={() =>
+                      setTheme(theme === "dark" ? "light" : "dark")
+                    }
+                    className="data-[state=checked]:bg-green-600"
+                    aria-label="Toggle Theme"
+                  />
+                  <Sun className="ml-2 h-6 w-6 text-amber-500" />
+                </div>
+              )}
+
               {loading ? (
                 <div className="flex items-center text-gray-500">
                   <div className="animate-pulse h-8 w-24 bg-gray-200 rounded" />
@@ -154,16 +157,17 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
               ) : user ? (
                 <div className="flex items-center">
                   <div className="hidden lg:block mr-4">
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
                       Welcome, {user.displayName || user.email?.split("@")[0]}
                     </span>
                   </div>
+
                   {/* Profile dropdown */}
                   <div className="relative ml-3">
                     <button
                       ref={profileButtonRef}
                       onClick={toggleProfileMenu}
-                      className="flex items-center text-gray-700 hover:text-green-600"
+                      className="flex items-center text-gray-700 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-500"
                     >
                       <FaUserCircle size={24} />
                       <span className="ml-1 hidden sm:inline">Profile</span>
@@ -176,7 +180,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                       >
                         <Link
                           href={profilePath}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                           onClick={() => setIsProfileMenuOpen(false)}
                         >
                           View Profile
@@ -186,7 +190,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                             handleLogout();
                             setIsProfileMenuOpen(false);
                           }}
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                         >
                           Sign Out
                         </button>
@@ -195,18 +199,20 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                   </div>
                 </div>
               ) : (
-                <Link
-                  href="/login"
-                  className="flex items-center px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors duration-300"
-                >
-                  <FaUser className="mr-2" />
-                  <span>Sign In</span>
-                </Link>
+                <div className="flex items-center">
+                  <Link
+                    href="/login"
+                    className="flex items-center px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors duration-300"
+                  >
+                    <FaUser className="mr-2" />
+                    <span>Sign In</span>
+                  </Link>
+                </div>
               )}
               {!loading && (
                 <button
                   onClick={toggleMenu}
-                  className="lg:hidden text-gray-700 hover:text-green-600 transition-colors ml-4"
+                  className="lg:hidden text-gray-700 dark:text-gray-300 hover:text-green-600 transition-colors ml-4"
                   aria-label={isMenuOpen ? "Close menu" : "Open menu"}
                 >
                   {isMenuOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
