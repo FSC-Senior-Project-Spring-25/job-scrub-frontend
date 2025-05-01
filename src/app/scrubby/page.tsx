@@ -50,7 +50,6 @@ export default function ScrubbyChatPage() {
   const { user } = useAuth();
   const [conversationHistory, setConversationHistory] = useState<any[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [streamedContent, setStreamedContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -427,14 +426,14 @@ export default function ScrubbyChatPage() {
                     </div>
                   </div>
                 ) : message.isStreaming ? (
-                  <div className="text-sm text-gray-800 prose prose-sm max-w-none">
+                  <div className="text-sm  prose prose-sm max-w-none">
                     <ReactMarkdown>{message.content}</ReactMarkdown>
                     <div className="inline-block h-4 w-4 ml-1 align-middle">
                       <span className="inline-flex w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-800 prose prose-sm max-w-none">
+                  <div className="text-sm prose prose-sm max-w-none">
                     <ReactMarkdown>{message.content}</ReactMarkdown>
                   </div>
                 )}
@@ -512,7 +511,7 @@ export default function ScrubbyChatPage() {
                   size="sm"
                   onClick={triggerFileInput}
                   disabled={isLoading || isStreaming}
-                  className="text-green-700 hover:bg-green-50"
+                  className="text-green-700 hover:bg-green-50 dark:hover:bg-green-700 dark:text-green-200"
                 >
                   <FileUp className="h-4 w-4 mr-1" />
                   <span className="text-sm font-bold">Attach PDF resume</span>
