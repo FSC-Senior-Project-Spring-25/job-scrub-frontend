@@ -344,82 +344,78 @@ export default function HomePage() {
     );
   }
 
-
-// 2. Not logged in (welcome page + scrubby)
-if (!user) {
-  return (
-    <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col md:flex-row items-center justify-between px-12 py-12 gap-12">
-      {/* Left side: Scrubby GIF */}
-      <div className="flex-1 max-w-lg rounded-xl p-12 text-center self-start -mt-8 bg-[#DDDBD5] dark:bg-muted shadow-md">
-        <img
-          src="/assets/Scrubby-logo.gif"
-          alt="Scrubby Logo"
-          className="mx-auto w-full mb-4 rounded"
-        />
-        <p className="text-black dark:text-foreground text-sm">
-          JobScrub simplifies your career journey with powerful tools designed to match you with the right opportunities.
-          Upload your resume, discover personalized job listings, and manage your applications — all in one place.
-          Your next career move starts here.
-        </p>
-        <Link href="/signup">
-          <button className="mt-4 bg-green-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-green-700">
-            Get Started
-          </button>
-        </Link>
-      </div>
-
-
+  // 2. Not logged in (welcome page + scrubby)
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col md:flex-row items-center justify-between px-12 py-12 gap-12">
+        {/* Left side: Scrubby GIF */}
+        <div className="flex-1 max-w-lg rounded-xl p-12 text-center self-start -mt-8 bg-[#DDDBD5] dark:bg-muted shadow-md">
+          <img
+            src="/assets/Scrubby-logo.gif"
+            alt="Scrubby Logo"
+            className="mx-auto w-full mb-4 rounded"
+          />
+          <p className="text-black dark:text-foreground text-sm">
+            JobScrub simplifies your career journey with powerful tools designed to match you with the right opportunities.
+            Upload your resume, discover personalized job listings, and manage your applications — all in one place.
+            Your next career move starts here.
+          </p>
+          <Link href="/signup">
+            <button className="mt-4 bg-green-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-green-700">
+              Get Started
+            </button>
+          </Link>
+        </div>
   
-      {/* Right side: text */}
-      <div className="flex-1 flex flex-col items-center text-center">
-        <div className="max-w-xl mx-auto">
-          <p className="text-green-600 dark:text-green-400 text-base font-semibold mb-2">
-            Find Your Dream Job Today!
-          </p>
-          <h1 className="text-6xl font-extrabold text-black dark:text-foreground">
-            Welcome to
-          </h1>
-          <h1 className="text-6xl font-extrabold text-black dark:text-foreground">
-            JobScrub!
-          </h1>
-          <p className="text-gray-700 dark:text-muted-foreground text-lg mt-6 leading-relaxed font-medium">
-            Your Career Journey, Simplified.
-          </p>
-
-          {/* Bullet Points */}
-          <ul className="text-gray-600 dark:text-muted-foreground text-sm mt-6 space-y-2 text-left pl-2">
-            <li>• Upload your resume in seconds</li>
-            <li>• Discover job matches instantly</li>
-            <li>• Track and manage your applications easily</li>
-          </ul>
-
-          {/* Buttons */}
-          <div className="mt-8 flex flex-col items-center">
-            <Link href="/signup">
-              <button className="px-8 py-3 bg-green-600 text-white font-semibold rounded-lg text-lg hover:bg-green-700">
-                Create an Account
-              </button>
-            </Link>
-            <Link href="/login" className="mt-4 text-blue-600 hover:underline text-base">
-              Already a User? Sign In
-            </Link>
+        {/* Right side: text */}
+        <div className="flex-1 flex flex-col items-center text-center">
+          <div className="max-w-xl mx-auto">
+            <p className="text-green-600 dark:text-green-400 text-base font-semibold mb-2">
+              Find Your Dream Job Today!
+            </p>
+            <h1 className="text-6xl font-extrabold text-black dark:text-foreground">
+              Welcome to
+            </h1>
+            <h1 className="text-6xl font-extrabold text-black dark:text-foreground">
+              JobScrub!
+            </h1>
+            <p className="text-gray-700 dark:text-muted-foreground text-lg mt-6 leading-relaxed font-medium">
+              Your Career Journey, Simplified.
+            </p>
+  
+            {/* Bullet Points */}
+            <ul className="text-gray-600 dark:text-muted-foreground text-sm mt-6 space-y-2 text-left pl-2">
+              <li>• Upload your resume in seconds</li>
+              <li>• Discover job matches instantly</li>
+              <li>• Track and manage your applications easily</li>
+            </ul>
+  
+            {/* Buttons */}
+            <div className="mt-8 flex flex-col items-center">
+              <Link href="/signup">
+                <button className="px-8 py-3 bg-green-600 text-white font-semibold rounded-lg text-lg hover:bg-green-700">
+                  Create an Account
+                </button>
+              </Link>
+              <Link href="/login" className="mt-4 text-blue-600 dark:text-blue-400 hover:underline text-base">
+                Already a User? Sign In
+              </Link>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
+    );
+  }
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col">
       <main className="flex-1 container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Left Sidebar / Profile Card */}
           <div className="md:col-span-1">
-            <div className="bg-white rounded-lg shadow p-6 mb-4">
+            <div className="bg-white dark:bg-card rounded-lg shadow p-6 mb-4 border border-gray-100 dark:border-gray-800">
               <div className="flex flex-col items-center">
                 <div
-                  className="w-24 h-24 bg-gradient-to-br from-green-100 bg-gray-100 rounded-full shadow-lg flex items-center justify-center text-5xl text-black cursor-pointer"
+                  className="w-24 h-24 bg-gradient-to-br from-green-100 to-gray-100 dark:from-green-900 dark:to-gray-800 rounded-full shadow-lg flex items-center justify-center text-5xl text-black dark:text-white cursor-pointer"
                   onClick={() => navigateToProfile(user.uid)}
                 >
                   {userProfileData?.profileIcon
@@ -435,14 +431,14 @@ if (!user) {
                   {user.displayName || user.email || "User"}
                 </p>
 
-                <p className="text-sm mt-1 text-gray-500">
+                <p className="text-sm mt-1 text-gray-500 dark:text-gray-400">
                   Member since:{" "}
                   {format(
                     new Date(user.metadata?.creationTime || Date.now()),
                     "yyyy"
                   )}
                 </p>
-                <div className="flex justify-center space-x-4 mt-2 text-sm text-gray-600">
+                <div className="flex justify-center space-x-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
                   <div>
                     <strong>{followersCount}</strong> followers
                   </div>
@@ -453,61 +449,65 @@ if (!user) {
               </div>
 
               {/* Quick Links Section */}
-              <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <h2 className="font-semibold text-lg mb-3">Quick Links</h2>
                 <nav className="space-y-2">
                   <Link
                     href="/jobs"
-                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 items-center"
                   >
-                    <FaBriefcase className="mr-2 text-green-600" /> Find Jobs
+                    <FaBriefcase className="mr-2 text-green-600 dark:text-green-500" />{" "}
+                    Find Jobs
                   </Link>
                   <Link
                     href="/jobs/report"
-                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 items-center"
                   >
-                    <Plus className="mr-2 text-green-600 h-4 w-4" /> Report Job
+                    <Plus className="mr-2 text-green-600 dark:text-green-500 h-4 w-4" />{" "}
+                    Report Job
                   </Link>
                   <Link
                     href="/jobs/verify"
-                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 items-center"
                   >
-                    <ShieldCheck className="mr-2 text-green-600 h-4 w-4" />{" "}
+                    <ShieldCheck className="mr-2 text-green-600 dark:text-green-500 h-4 w-4" />{" "}
                     Verify Jobs
                   </Link>
                   <Link
                     href="/scrubby"
-                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 items-center"
                   >
-                    <User className="mr-2 text-green-600 h-4 w-4" /> Resume Help
+                    <User className="mr-2 text-green-600 dark:text-green-500 h-4 w-4" />{" "}
+                    Resume Help
                   </Link>
                   <Link
                     href="/applications"
-                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 items-center"
                   >
-                    <FaRegClock className="mr-2 text-green-600" /> My
-                    Applications
+                    <FaRegClock className="mr-2 text-green-600 dark:text-green-500" />{" "}
+                    My Applications
                   </Link>
                   <Link
                     href="/saved"
-                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 items-center"
                   >
-                    <FaRegBookmark className="mr-2 text-green-600" /> Saved Jobs
+                    <FaRegBookmark className="mr-2 text-green-600 dark:text-green-500" />{" "}
+                    Saved Jobs
                   </Link>
                 </nav>
               </div>
             </div>
 
             {/* Job Search Card */}
-            <div className="bg-white rounded-lg shadow p-4 mb-4">
+            <div className="bg-white dark:bg-card rounded-lg shadow p-4 mb-4 border border-gray-100 dark:border-gray-800">
               <h2 className="font-semibold text-lg mb-3">Find Jobs</h2>
               <div className="flex items-center">
-                <div className="flex-1 flex items-center border border-gray-300 rounded-lg bg-white px-4 py-2">
+                <div className="flex-1 flex items-center border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 px-4 py-2">
                   <FaSearch className="text-gray-500" />
                   <input
                     type="text"
                     placeholder="Search for jobs..."
-                    className="ml-2 flex-1 outline-none"
+                    className="ml-2 flex-1 outline-none bg-transparent"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     onKeyDown={(e) => {
@@ -536,7 +536,7 @@ if (!user) {
               </div>
               <Button
                 variant="outline"
-                className="w-full mt-3 text-green-700 border-green-200"
+                className="w-full mt-3 text-green-700 dark:text-green-500 border-green-200 dark:border-green-800"
                 onClick={() => router.push("/jobs")}
               >
                 View All Jobs
@@ -547,12 +547,12 @@ if (!user) {
           {/* Main Content - Social Feed (from Connect page) */}
           <div className="md:col-span-2 space-y-6">
             {/* Create Post Card */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-800">
+            <div className="bg-white dark:bg-card p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
                 What's on your mind?
               </h2>
               <textarea
-                className="w-full mt-3 p-3 rounded-lg border border-gray-300 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 transition"
+                className="w-full mt-3 p-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 transition"
                 rows={3}
                 value={newPostContent}
                 onChange={(e) => setNewPostContent(e.target.value)}
@@ -572,12 +572,14 @@ if (!user) {
 
             {postsLoading ? (
               <div className="text-center py-10">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-600"></div>
-                <p className="mt-2 text-gray-600">Loading posts...</p>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-600 dark:border-green-500"></div>
+                <p className="mt-2 text-gray-600 dark:text-gray-400">
+                  Loading posts...
+                </p>
               </div>
             ) : posts.length === 0 ? (
-              <div className="text-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
-                <p className="text-gray-400 py-8 text-lg italic">
+              <div className="text-center py-10 bg-white dark:bg-card rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                <p className="text-gray-400 dark:text-gray-500 py-8 text-lg italic">
                   No posts yet. Be the first to share something inspiring!
                 </p>
               </div>
@@ -585,12 +587,12 @@ if (!user) {
               posts.map((post) => (
                 <Card
                   key={post.id}
-                  className="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow bg-white"
+                  className="border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow"
                 >
                   <CardContent className="p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <div
-                        className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl font-bold text-black cursor-pointer"
+                        className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xl font-bold text-black dark:text-white cursor-pointer"
                         onClick={() => navigateToProfile(post.author_uid)}
                       >
                         {post.profileIcon || post.author.charAt(0)}
@@ -602,12 +604,12 @@ if (!user) {
                         >
                           {post.author}
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
                           {format(new Date(post.created_at), "PPP")}
                         </p>
                       </div>
                     </div>
-                    <div className="text-gray-800 mt-4 text-sm leading-relaxed whitespace-pre-wrap">
+                    <div className="text-gray-800 dark:text-gray-200 mt-4 text-sm leading-relaxed whitespace-pre-wrap">
                       <ReactMarkdown>{post.content}</ReactMarkdown>
                     </div>
                     <div className="flex items-center gap-4 mt-4">
@@ -617,13 +619,15 @@ if (!user) {
                         onClick={() => toggleLike(post.id)}
                         className={
                           post.userHasLiked
-                            ? "bg-pink-100 text-pink-500 hover:bg-pink-200"
+                            ? "bg-pink-100 dark:bg-pink-900 text-pink-500 dark:text-pink-300 hover:bg-pink-200 dark:hover:bg-pink-800"
                             : ""
                         }
                       >
                         <Heart
                           className={`w-4 h-4 mr-1 ${
-                            post.userHasLiked ? "fill-pink-500" : ""
+                            post.userHasLiked
+                              ? "fill-pink-500 dark:fill-pink-300"
+                              : ""
                           }`}
                         />
                         {post.likes || 0}
@@ -639,12 +643,12 @@ if (!user) {
                     </div>
 
                     {showComments[post.id] && (
-                      <div className="mt-4 border-t pt-3">
+                      <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-3">
                         <div className="flex gap-2 mb-3">
                           <input
                             type="text"
                             placeholder="Write a comment..."
-                            className="flex-grow p-2 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-green-400 transition-all"
+                            className="flex-grow p-2 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-full focus:ring-2 focus:ring-green-400 transition-all"
                             value={commentInputs[post.id] || ""}
                             onChange={(e) =>
                               handleCommentInputChange(post.id, e.target.value)
@@ -665,7 +669,7 @@ if (!user) {
                           post.comments.map((comment, idx) => (
                             <div
                               key={comment.id || idx}
-                              className="border-b last:border-0 py-2"
+                              className="border-b border-gray-200 dark:border-gray-700 last:border-0 py-2"
                             >
                               <div className="flex justify-between items-center">
                                 <p
@@ -676,20 +680,20 @@ if (!user) {
                                 >
                                   {comment.author}
                                 </p>
-                                <p className="text-xs text-gray-400">
+                                <p className="text-xs text-gray-400 dark:text-gray-500">
                                   {format(
                                     new Date(comment.created_at),
                                     "MMM d, h:mm a"
                                   )}
                                 </p>
                               </div>
-                              <p className="text-sm mt-1 text-gray-800">
+                              <p className="text-sm mt-1 text-gray-800 dark:text-gray-200">
                                 {comment.text}
                               </p>
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
                             No comments yet. Be the first to comment!
                           </p>
                         )}
