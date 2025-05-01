@@ -45,6 +45,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useAuth } from "../auth-context";
 import AnimatedLogo from "@/components/animated-logo";
+import { useSearchParams } from "next/navigation";
 
 // Map job type to a more readable format
 const jobTypeLabels = {
@@ -61,7 +62,6 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState("");
   const [userLocation, setUserLocation] = useState<{
     lat: number;
     lng: number;
@@ -84,8 +84,25 @@ export default function JobsPage() {
     maxDistance: 50, // in miles
     datePosted: "anytime",
   });
-  const { user, loading: authLoading } = useAuth();
   const jobsPerPage = 10;
+  const { user, loading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  
+  // Process URL search params on initial load
+  useEffect(() => {
+    const searchQuery = searchParams.get("search");
+    if (searchQuery) {
+      setSearch(searchQuery);
+      // If there's a search query in the URL, we should apply it immediately
+      const hasActiveFilters = true; // Force filter application
+      if (hasActiveFilters) {
+        debouncedFetchFilteredJobs();
+      }
+    } else {
+      fetchJobs(); // Default fetch all jobs if no search param
+    }
+  }, [searchParams]); // Re-run when URL parameters change
 
   // Calculate distance between two coordinates
   const calculateDistance = (
