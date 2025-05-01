@@ -834,13 +834,13 @@ export default function JobsPage() {
                       <Badge
                         key={index}
                         variant="outline"
-                        className="bg-gray-50"
+                        className="bg-green-50 text-green-700"
                       >
                         {skill}
                       </Badge>
                     ))}
                     {job.skills.length > 5 && (
-                      <Badge variant="outline" className="bg-gray-50">
+                      <Badge variant="outline" className="bg-green-50 text-green-700">
                         +{job.skills.length - 5} more
                       </Badge>
                     )}

@@ -310,22 +310,25 @@ export default function Home() {
         const isMatched = keywordInfo.matched;
         const score = keywordInfo.score;
 
-        // Determine highlight color based on match status and score
+        // Determine highlight color based on match status and score - with dark mode variants
         let highlightClass = "";
         if (isMatched) {
           highlightClass =
             score >= 0.8
-              ? "bg-green-200 hover:bg-green-300"
+              ? "bg-green-200 dark:bg-green-900/50 hover:bg-green-300 dark:hover:bg-green-800/60 text-gray-900 dark:text-gray-100"
               : score >= 0.6
-              ? "bg-amber-200 hover:bg-amber-300"
-              : "bg-red-200 hover:bg-red-300";
+              ? "bg-amber-200 dark:bg-amber-900/50 hover:bg-amber-300 dark:hover:bg-amber-800/60 text-gray-900 dark:text-gray-100"
+              : "bg-red-200 dark:bg-red-900/50 hover:bg-red-300 dark:hover:bg-red-800/60 text-gray-900 dark:text-gray-100";
         } else {
-          highlightClass = "bg-red-200 hover:bg-red-300";
+          highlightClass =
+            "bg-red-200 dark:bg-red-900/50 hover:bg-red-300 dark:hover:bg-red-800/60 text-gray-900 dark:text-gray-100";
         }
 
         // Add additional styling if this is the selected keyword
         const isSelected = selectedKeyword?.toLowerCase() === lowerPart;
-        const selectedClass = isSelected ? "ring-2 ring-primary" : "";
+        const selectedClass = isSelected
+          ? "ring-2 ring-primary dark:ring-primary-foreground"
+          : "";
 
         return (
           <button
@@ -335,7 +338,7 @@ export default function Home() {
           >
             {part}
             {isMatched && (
-              <span className="text-xs ml-0.5 font-medium">
+              <span className="text-xs ml-0.5 font-medium dark:text-gray-200">
                 ({(score * 100).toFixed(0)}%)
               </span>
             )}
@@ -625,8 +628,9 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Chart and Keyword Summary */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-4 bg-muted/50 rounded-lg h-[300px] flex flex-col">
+                <div className="p-4 bg-muted/50 dark:bg-muted/20 rounded-lg h-[300px] flex flex-col">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-medium">Top Keyword Matches</h3>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -643,14 +647,20 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="p-4 bg-muted/50 rounded-lg">
+                <div className="p-4 bg-muted/50 dark:bg-muted/20 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-medium">Keyword Summary</h3>
                     <div className="flex items-center space-x-2">
-                      <Badge variant="outline" className="bg-green-100">
+                      <Badge
+                        variant="outline"
+                        className="bg-green-100 dark:bg-green-900/30 dark:text-green-300"
+                      >
                         {matchResult.similarity_details.length} matched
                       </Badge>
-                      <Badge variant="outline" className="bg-red-100">
+                      <Badge
+                        variant="outline"
+                        className="bg-red-100 dark:bg-red-900/30 dark:text-red-300"
+                      >
                         {matchResult.missing_keywords.flat().length} missing
                       </Badge>
                     </div>
@@ -662,17 +672,17 @@ export default function Home() {
                       </h4>
                       <div className="flex flex-wrap gap-2">
                         <div className="flex items-center">
-                          <span className="inline-block w-3 h-3 bg-green-200 mr-1 rounded"></span>
+                          <span className="inline-block w-3 h-3 bg-green-200 dark:bg-green-700 mr-1 rounded"></span>
                           <span className="text-xs">Strong Match (80%+)</span>
                         </div>
                         <div className="flex items-center">
-                          <span className="inline-block w-3 h-3 bg-amber-200 mr-1 rounded"></span>
+                          <span className="inline-block w-3 h-3 bg-amber-200 dark:bg-amber-700 mr-1 rounded"></span>
                           <span className="text-xs">
                             Partial Match (60-79%)
                           </span>
                         </div>
                         <div className="flex items-center">
-                          <span className="inline-block w-3 h-3 bg-red-200 mr-1 rounded"></span>
+                          <span className="inline-block w-3 h-3 bg-red-200 dark:bg-red-700 mr-1 rounded"></span>
                           <span className="text-xs">Weak Match or Missing</span>
                         </div>
                       </div>
@@ -762,7 +772,7 @@ export default function Home() {
 
                   <div
                     ref={jobDescriptionRef}
-                    className="p-4 bg-muted/50 rounded-lg max-h-[500px] overflow-y-auto whitespace-pre-wrap"
+                    className="p-4 bg-muted/50 dark:bg-muted/20 rounded-lg max-h-[500px] overflow-y-auto whitespace-pre-wrap"
                   >
                     {highlightJobDescription()}
                   </div>
@@ -818,11 +828,11 @@ export default function Home() {
                           } ${
                             item.matched
                               ? item.score >= 0.8
-                                ? "bg-green-50 border border-green-200"
+                                ? "bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800"
                                 : item.score >= 0.6
-                                ? "bg-amber-50 border border-amber-200"
-                                : "bg-red-50 border border-red-200"
-                              : "bg-red-50 border border-red-200"
+                                ? "bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800"
+                                : "bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800"
+                              : "bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800"
                           }`}
                           onClick={() => handleKeywordClick(item.keyword)}
                         >
@@ -907,7 +917,7 @@ export default function Home() {
                   <h4 className="font-medium mb-2">
                     Context in Job Description:
                   </h4>
-                  <div className="p-3 bg-muted rounded-md text-sm max-h-[200px] overflow-y-auto">
+                  <div className="p-3 bg-muted dark:bg-muted/30 rounded-md text-sm max-h-[200px] overflow-y-auto">
                     {jobDescription
                       .split(new RegExp(`\\b(${selectedKeyword})\\b`, "gi"))
                       .map((part, i) =>
@@ -915,7 +925,7 @@ export default function Home() {
                         selectedKeyword?.toLowerCase() ? (
                           <mark
                             key={i}
-                            className="bg-yellow-200 px-0.5 rounded"
+                            className="bg-yellow-200 dark:bg-yellow-700/70 text-black dark:text-white px-0.5 rounded"
                           >
                             {part}
                           </mark>
@@ -930,7 +940,7 @@ export default function Home() {
                   {isKeywordMissing ? (
                     <>
                       <h4 className="font-medium mb-2">Suggestions:</h4>
-                      <div className="p-3 bg-muted rounded-md text-sm max-h-[200px] overflow-y-auto">
+                      <div className="p-3 bg-muted dark:bg-muted/30 rounded-md text-sm max-h-[200px] overflow-y-auto">
                         <ul className="list-disc list-inside space-y-2">
                           {generateSuggestions(selectedKeyword || "").map(
                             (suggestion, index) => (
@@ -945,26 +955,26 @@ export default function Home() {
                       <h4 className="font-medium mb-2">
                         Where it appears in your resume:
                       </h4>
-                      <div className="p-3 bg-muted rounded-md text-sm max-h-[200px] overflow-y-auto">
+                      <div className="p-3 bg-muted dark:bg-muted/30 rounded-md text-sm max-h-[200px] overflow-y-auto">
                         <p className="italic text-muted-foreground">
                           This is a simulated view. In a real implementation, we
                           would show the actual context from your resume.
                         </p>
-                        <div className="mt-2 p-2 bg-green-50 rounded border border-green-200">
+                        <div className="mt-2 p-2 rounded border border-green-200 dark:border-green-800">
                           <p>
                             <span className="font-medium">Skills section:</span>{" "}
                             JavaScript, React,{" "}
-                            <mark className="bg-yellow-200 px-0.5 rounded">
+                            <mark className="bg-yellow-200 dark:bg-yellow-700/70 text-black dark:text-white px-0.5 rounded">
                               {selectedKeyword}
                             </mark>
                             , HTML, CSS
                           </p>
                         </div>
-                        <div className="mt-2 p-2 bg-green-50 rounded border border-green-200">
+                        <div className="mt-2 p-2 rounded border border-green-200 dark:border-green-800">
                           <p>
                             <span className="font-medium">Experience:</span>{" "}
                             "Used{" "}
-                            <mark className="bg-yellow-200 px-0.5 rounded">
+                            <mark className="bg-yellow-200 dark:bg-yellow-700/70 text-black dark:text-white px-0.5 rounded">
                               {selectedKeyword}
                             </mark>{" "}
                             to develop scalable solutions..."
