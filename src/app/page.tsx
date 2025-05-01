@@ -344,48 +344,71 @@ export default function HomePage() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex flex-col items-center">
-        <div className="mt-6 w-full flex items-center px-6">
-          <span className="mr-6 font-semibold text-black whitespace-nowrap">
-            Your Job Search, Our Priority.
-          </span>
-          <div className="flex-1 flex items-center border border-gray-300 rounded-lg bg-white px-4 py-2 w-full max-w-full">
-            <FaSearch className="text-gray-500" />
-            <input
-              type="text"
-              placeholder="Job Title or Company"
-              className="ml-2 flex-1 outline-none w-full"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-        </div>
 
-        <div className="flex flex-col items-center mt-32 text-center">
-          <h2 className="text-6xl font-extrabold text-black drop-shadow-md">
+// 2. Not logged in (welcome page + scrubby)
+if (!user) {
+  return (
+    <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col md:flex-row items-center justify-between px-12 py-12 gap-12">
+      {/* Left side: Scrubby GIF */}
+      <div className="flex-1 max-w-lg rounded-xl p-12 text-center self-start -mt-8 bg-[#DDDBD5] dark:bg-muted shadow-md">
+        <img
+          src="/assets/Scrubby-logo.gif"
+          alt="Scrubby Logo"
+          className="mx-auto w-full mb-4 rounded"
+        />
+        <p className="text-black dark:text-foreground text-sm">
+          JobScrub simplifies your career journey with powerful tools designed to match you with the right opportunities.
+          Upload your resume, discover personalized job listings, and manage your applications — all in one place.
+          Your next career move starts here.
+        </p>
+        <Link href="/signup">
+          <button className="mt-4 bg-green-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-green-700">
+            Get Started
+          </button>
+        </Link>
+      </div>
+
+
+  
+      {/* Right side: text */}
+      <div className="flex-1 flex flex-col items-center text-center">
+        <div className="max-w-xl mx-auto">
+          <p className="text-green-600 dark:text-green-400 text-base font-semibold mb-2">
+            Find Your Dream Job Today!
+          </p>
+          <h1 className="text-6xl font-extrabold text-black dark:text-foreground">
             Welcome to
-          </h2>
-          <h2 className="text-6xl font-extrabold text-black drop-shadow-md mt-2">
-            JobScrub
-          </h2>
-          <p className="text-gray-600 text-lg mt-2 font-semibold drop-shadow-sm">
+          </h1>
+          <h1 className="text-6xl font-extrabold text-black dark:text-foreground">
+            JobScrub!
+          </h1>
+          <p className="text-gray-700 dark:text-muted-foreground text-lg mt-6 leading-relaxed font-medium">
             Your Career Journey, Simplified.
           </p>
-          <Link
-            href="signup"
-            className="mt-6 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            Create an Account
-          </Link>
-          <Link href="login" className="mt-2 text-blue-600 hover:underline">
-            Already a User? Sign In
-          </Link>
+
+          {/* Bullet Points */}
+          <ul className="text-gray-600 dark:text-muted-foreground text-sm mt-6 space-y-2 text-left pl-2">
+            <li>• Upload your resume in seconds</li>
+            <li>• Discover job matches instantly</li>
+            <li>• Track and manage your applications easily</li>
+          </ul>
+
+          {/* Buttons */}
+          <div className="mt-8 flex flex-col items-center">
+            <Link href="/signup">
+              <button className="px-8 py-3 bg-green-600 text-white font-semibold rounded-lg text-lg hover:bg-green-700">
+                Create an Account
+              </button>
+            </Link>
+            <Link href="/login" className="mt-4 text-blue-600 hover:underline text-base">
+              Already a User? Sign In
+            </Link>
+          </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">

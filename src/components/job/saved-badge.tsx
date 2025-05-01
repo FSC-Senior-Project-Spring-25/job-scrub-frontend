@@ -31,10 +31,10 @@ export default function SavedJobsBadge() {
       <FaRegBookmark className="mr-2" />
       Saved Jobs
       {count > 0 && (
-        <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">
+        <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-800">
           {count}
         </span>
       )}
     </Link>
   );
-}
+}  
