@@ -34,17 +34,20 @@ export interface JobReport {
 
 export interface Job {
   id: string;
+  title: string;
   company: string;
-  date: string;
   description: string;
-  jobType: string;
+  jobType: 'fulltime' | 'parttime' | 'contract' | 'volunteer' | 'internship';
+  locationType: 'remote' | 'onsite' | 'hybrid';
+  address?: string;
+  location?: Location | null;
   lat: number;
-  location: string;
   lon: number;
   salary: string;
   skills: string[];
+  keywords?: string[];
   benefits?: string[];
-  title: string;
+  date: string;
   url: string;
   verified: boolean;
 }
