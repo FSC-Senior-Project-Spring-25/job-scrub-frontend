@@ -22,10 +22,10 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp?: number;
-  files?: Array<{
+  resumeFile?: {
     name: string;
     type: string;
-  }>;
+  };
   isLoading?: boolean;
   isStreaming?: boolean;
 }
@@ -44,7 +44,7 @@ export default function ScrubbyChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [files, setFiles] = useState<File[]>([]);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -61,9 +61,9 @@ export default function ScrubbyChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamedContent]);
 
-  // Update suggestions when files change or messages reset
+  // Update suggestions when resumeFile changes or messages reset
   useEffect(() => {
-    if (files.length > 0) {
+    if (resumeFile) {
       setSuggestions([
         "Can you summarize my resume?",
         "How can I improve my work experience section?",
@@ -72,7 +72,7 @@ export default function ScrubbyChatPage() {
     } else {
       setSuggestions([]);
     }
-  }, [files, messages]);
+  }, [resumeFile, messages]);
 
   // Clean up any active stream when component unmounts
   useEffect(() => {
@@ -85,16 +85,16 @@ export default function ScrubbyChatPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!input.trim() && files.length === 0) return;
+    if (!input.trim() && !resumeFile) return;
 
     const userMessage: Message = {
       role: "user",
       content: input,
       timestamp: Date.now(),
-      files: files.map((file) => ({
-        name: file.name,
-        type: file.type,
-      })),
+      resumeFile: resumeFile ? {
+        name: resumeFile.name,
+        type: resumeFile.type,
+      } : undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -129,9 +129,9 @@ export default function ScrubbyChatPage() {
         JSON.stringify(conversationHistory)
       );
     
-      // Rename files to resume and only send the first one
-      if (files.length > 0) {
-        formData.append("resume", files[0]);
+      // Add resume file if available
+      if (resumeFile) {
+        formData.append("resume", resumeFile);
       }
     
       const token = await user?.getIdToken();
@@ -235,40 +235,38 @@ export default function ScrubbyChatPage() {
                 });
                 break;
 
-                case "error":
-                  // Handle server-side error without throwing
-                  console.error("Server error:", data.error);
-                  // Store the error in state to display to user but don't throw
-                  setMessages((prev) => {
-                    const finalMessages = prev.filter((m) => !m.isStreaming);
-                    return [
-                      ...finalMessages,
-                      {
-                        role: "assistant",
-                        content: `Sorry, I couldn't process your request: ${data.error || "An unknown error occurred"}`,
-                        timestamp: Date.now(),
-                      },
-                    ];
-                  });
-                  
-                  // Break the streaming loop after error
-                  accumulatedContent = "ERROR_OCCURRED";
-                  break;
-              }
-              
-              // Check if we need to break the streaming due to error
-              if (accumulatedContent === "ERROR_OCCURRED") {
-                // Exit the while loop
+              case "error":
+                // Handle server-side error without throwing
+                console.error("Server error:", data.error);
+                // Store the error in state to display to user but don't throw
+                setMessages((prev) => {
+                  const finalMessages = prev.filter((m) => !m.isStreaming);
+                  return [
+                    ...finalMessages,
+                    {
+                      role: "assistant",
+                      content: `Sorry, I couldn't process your request: ${data.error || "An unknown error occurred"}`,
+                      timestamp: Date.now(),
+                    },
+                  ];
+                });
+                
+                // Break the streaming loop after error
+                accumulatedContent = "ERROR_OCCURRED";
                 break;
-              }
-            } catch (err) {
-              console.error("Error parsing stream data:", err, jsonData);
-              // Continue processing the stream - we don't want to break on parse errors
             }
+            
+            // Check if we need to break the streaming due to error
+            if (accumulatedContent === "ERROR_OCCURRED") {
+              // Exit the while loop
+              break;
+            }
+          } catch (err) {
+            console.error("Error parsing stream data:", err, jsonData);
+            // Continue processing the stream - we don't want to break on parse errors
+          }
         }
       }
-
-      setFiles([]);
     } catch (error) {
       console.error("Error:", error);
 
@@ -313,13 +311,16 @@ export default function ScrubbyChatPage() {
         return;
       }
 
-      // Replace existing files with the new file (only keep one)
-      setFiles([file]);
+      // Set the resumeFile
+      setResumeFile(file);
     }
   };
 
-  const removeFile = (index: number) => {
-    setFiles([]);
+  const removeResumeFile = () => {
+    setResumeFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const triggerFileInput = () => {
@@ -409,6 +410,12 @@ export default function ScrubbyChatPage() {
                 {message.role === "user" ? (
                   <div className="whitespace-pre-wrap text-sm text-white">
                     {message.content}
+                    {message.resumeFile && (
+                      <div className="mt-2 p-1 bg-green-600 rounded flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <span className="text-xs">{message.resumeFile.name}</span>
+                      </div>
+                    )}
                   </div>
                 ) : message.isLoading && !message.content ? (
                   <div className="whitespace-pre-wrap text-sm">
@@ -429,29 +436,6 @@ export default function ScrubbyChatPage() {
                 ) : (
                   <div className="text-sm text-gray-800 prose prose-sm max-w-none">
                     <ReactMarkdown>{message.content}</ReactMarkdown>
-                  </div>
-                )}
-
-                {message.files && message.files.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    {message.files.map((file, fileIndex) => (
-                      <div
-                        key={fileIndex}
-                        className="bg-white rounded-lg border border-green-200 p-2"
-                      >
-                        <div className="text-xs font-medium text-green-700 mb-1">
-                          {file.name}
-                        </div>
-                        <div className="h-40 border rounded flex items-center justify-center bg-gray-50">
-                          <div className="flex items-center justify-center h-full flex-col">
-                            <FileText className="h-10 w-10 text-red-500" />
-                            <span className="text-xs mt-1 text-black">
-                              PDF File
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>
@@ -479,32 +463,6 @@ export default function ScrubbyChatPage() {
           </div>
         )}
 
-        {files.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {files.map((file, index) => (
-              <div
-                key={index}
-                className="group relative bg-white rounded-lg border border-green-200 p-2 w-full max-w-[200px]"
-              >
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs font-medium text-green-700 truncate">
-                    {file.name}
-                  </span>
-                  <button
-                    onClick={() => removeFile(index)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="h-32 border rounded bg-gray-50">
-                  {renderFilePreview(file)}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         <form
           onSubmit={handleSubmit}
           className="sticky bottom-0 bg-white rounded-xl border border-green-100 shadow-sm p-3"
@@ -518,14 +476,14 @@ export default function ScrubbyChatPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                if (input.trim() || files.length > 0) {
+                if (input.trim() || resumeFile) {
                   handleSubmit(e as unknown as FormEvent);
                 }
               }
             }}
           />
           <div className="flex justify-between items-center mt-2">
-            <div>
+            <div className="flex items-center gap-2">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -533,19 +491,33 @@ export default function ScrubbyChatPage() {
                 className="hidden"
                 accept=".pdf,application/pdf"
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={triggerFileInput}
-                disabled={isLoading || isStreaming || files.length > 0}
-                className={`text-green-700 ${
-                  files.length > 0 ? "opacity-50" : "hover:bg-green-50"
-                }`}
-              >
-                <FileUp className="h-4 w-4 mr-1" />
-                <span className="text-sm font-bold">Attach PDF resume</span>
-              </Button>
+              {resumeFile ? (
+                <div className="flex items-center gap-2 bg-green-50 py-1 px-3 rounded-full">
+                  <FileText className="h-4 w-4 text-green-600" />
+                  <span className="text-xs text-green-700 truncate max-w-[150px]">
+                    {resumeFile.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={removeResumeFile}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={triggerFileInput}
+                  disabled={isLoading || isStreaming}
+                  className="text-green-700 hover:bg-green-50"
+                >
+                  <FileUp className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-bold">Attach PDF resume</span>
+                </Button>
+              )}
             </div>
 
             <Button
@@ -554,7 +526,7 @@ export default function ScrubbyChatPage() {
               disabled={
                 isLoading ||
                 isStreaming ||
-                (!input.trim() && files.length === 0)
+                (!input.trim() && !resumeFile)
               }
               className="bg-green-600 hover:bg-green-700"
             >
