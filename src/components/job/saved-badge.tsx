@@ -26,15 +26,15 @@ export default function SavedJobsBadge() {
   return (
     <Link
       href="/saved_jobs"
-      className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+      className="flex items-center px-3 py-2 rounded hover:bg-gray-100 hover:text-gray-800 dark:hover:bg-muted dark:hover:text-foreground transition-colors"
     >
       <FaRegBookmark className="mr-2" />
       Saved Jobs
       {count > 0 && (
-        <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">
+        <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-800">
           {count}
         </span>
       )}
     </Link>
   );
-}
+}  
