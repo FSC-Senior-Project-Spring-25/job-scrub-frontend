@@ -4,14 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   FaSearch,
-  FaMapMarkerAlt,
   FaBriefcase,
-  FaDollarSign,
-  FaFilter,
-  FaLocationArrow,
   FaRegClock,
   FaRegBookmark,
-  FaPlus,
 } from "react-icons/fa";
 import { toast } from "sonner";
 import { useAuth } from "./auth-context";
@@ -19,7 +14,7 @@ import AnimatedLogo from "@/components/animated-logo";
 import { Button } from "@/components/ui/button";
 import ChatPopup from "@/components/messages/chat-popup";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/app/firebase";
+import { auth, db } from "@/app/firebase";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import {
@@ -55,7 +50,6 @@ interface Post {
 
 export default function HomePage() {
   const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -157,14 +151,14 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!user) return;
-    const intervalId = setInterval(() => fetchPosts(), 60000);
+    const intervalId = setInterval(() => fetchPosts(), 5 * 60000);
     return () => clearInterval(intervalId);
   }, [user]);
 
   async function toggleLike(postId: string) {
     if (!user) return;
     try {
-      const token = await user.getIdToken();
+      // Optimistic update
       setPosts((currentPosts) =>
         currentPosts.map((post) =>
           post.id === postId
@@ -176,23 +170,30 @@ export default function HomePage() {
             : post
         )
       );
-
-      await fetch(`/api/posts/${postId}/like`, {
+      
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/posts/like?postId=${encodeURIComponent(postId)}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });
+      
+      // Only refetch on error
+      if (!response.ok) {
+        throw new Error("Failed to toggle like");
+      }
     } catch (err) {
       console.error("Error toggling like:", err);
+      // Only fetch posts on error to revert the optimistic update
       fetchPosts();
     }
   }
 
   async function handleAddPost() {
     if (!user || !newPostContent.trim()) return;
-
+  
     const tempId = `temp-${Date.now()}`;
     const newPost = {
       id: tempId,
@@ -203,12 +204,13 @@ export default function HomePage() {
       likes: 0,
       comments: [],
       userHasLiked: false,
-      profileIcon: undefined,
+      profileIcon: userProfileData?.profileIcon || user.displayName?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U",
     };
-
+  
+    // Optimistic update
     setPosts((currentPosts) => [newPost, ...currentPosts]);
     setNewPostContent("");
-
+    console.log("User Name:", user.displayName);
     try {
       const token = await user.getIdToken();
       const response = await fetch("/api/posts", {
@@ -223,15 +225,17 @@ export default function HomePage() {
           created_at: newPost.created_at,
         }),
       });
-
+  
       if (!response.ok) {
+        // Remove the temp post on failure
         setPosts((currentPosts) => currentPosts.filter((post) => post.id !== tempId));
         throw new Error("Failed to create post");
       }
-
+  
       const result = await response.json();
+      // Just update the ID and any server-generated fields
       setPosts((currentPosts) =>
-        currentPosts.map((post) => (post.id === tempId ? { ...result } : post))
+        currentPosts.map((post) => (post.id === tempId ? { ...post, id: result.id } : post))
       );
     } catch (error) {
       console.error("Error creating post:", error);
@@ -254,36 +258,59 @@ export default function HomePage() {
     if (!user) return;
     const commentText = commentInputs[postId]?.trim();
     if (!commentText) return;
-
+  
     try {
       const token = await user.getIdToken();
       const newComment = {
         id: "temp-" + Date.now(),
-        author: user.displayName || user.email ||  "Anonymous",
+        author: user.displayName || user.email || "Anonymous",
         author_uid: user.uid,
         text: commentText,
         created_at: new Date().toISOString(),
       };
-
+  
+      // Optimistic update
       setPosts((prevPosts) =>
         prevPosts.map((post) =>
           post.id === postId ? { ...post, comments: [newComment, ...post.comments] } : post
         )
       );
       setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
-
-      await fetch(`/api/posts/${postId}/comment`, {
+  
+      const response = await fetch(`/api/posts/comment?postId=${encodeURIComponent(postId)}`, {
         method: "POST",
-        body: JSON.stringify({ text: commentText }),
+        body: JSON.stringify({ 
+          text: commentText,
+          author: user.displayName || user.email || "Anonymous",
+        }),
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       });
-
-      fetchPosts();
+      
+      // Only update the specific comment with the server response if needed
+      if (response.ok) {
+        const data = await response.json();
+        if (data.id) {
+          // Update just this one comment with the real ID from the server
+          setPosts((prevPosts) =>
+            prevPosts.map((post) => {
+              if (post.id !== postId) return post;
+              
+              // Find and update the temporary comment with real data
+              const updatedComments = post.comments.map(comment => 
+                comment.id === newComment.id ? {...comment, id: data.id} : comment
+              );
+              
+              return { ...post, comments: updatedComments };
+            })
+          );
+        }
+      }
     } catch (error) {
       console.error("Error adding comment:", error);
+      // Only fetch posts on error to revert the optimistic update
       fetchPosts();
     }
   }
@@ -533,7 +560,7 @@ export default function HomePage() {
                             className="flex-grow p-2 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-green-400 transition-all"
                             value={commentInputs[post.id] || ""}
                             onChange={(e) => handleCommentInputChange(post.id, e.target.value)}
-                            onKeyPress={(e) => e.key === "Enter" && submitComment(post.id)}
+                            onKeyDown={(e) => e.key === "Enter" && submitComment(post.id)}
                           />
                           <Button
                             size="sm"
