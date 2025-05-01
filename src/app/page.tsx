@@ -24,6 +24,7 @@ import {
   Send,
   User,
   ArrowRight,
+  ShieldCheck,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import ReactMarkdown from "react-markdown";
@@ -56,7 +57,9 @@ export default function HomePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
   const [newPostContent, setNewPostContent] = useState("");
-  const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>({});
+  const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>(
+    {}
+  );
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -70,7 +73,7 @@ export default function HomePage() {
   // Fetch posts from the Connect page
   const fetchPosts = async () => {
     if (!user) return;
-    
+
     try {
       setPostsLoading(true);
       const token = await user.getIdToken();
@@ -170,16 +173,19 @@ export default function HomePage() {
             : post
         )
       );
-      
+
       const token = await user.getIdToken();
-      const response = await fetch(`/api/posts/like?postId=${encodeURIComponent(postId)}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-      
+      const response = await fetch(
+        `/api/posts/like?postId=${encodeURIComponent(postId)}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
       // Only refetch on error
       if (!response.ok) {
         throw new Error("Failed to toggle like");
@@ -193,7 +199,7 @@ export default function HomePage() {
 
   async function handleAddPost() {
     if (!user || !newPostContent.trim()) return;
-  
+
     const tempId = `temp-${Date.now()}`;
     const newPost = {
       id: tempId,
@@ -204,9 +210,13 @@ export default function HomePage() {
       likes: 0,
       comments: [],
       userHasLiked: false,
-      profileIcon: userProfileData?.profileIcon || user.displayName?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U",
+      profileIcon:
+        userProfileData?.profileIcon ||
+        user.displayName?.charAt(0).toUpperCase() ||
+        user.email?.charAt(0).toUpperCase() ||
+        "U",
     };
-  
+
     // Optimistic update
     setPosts((currentPosts) => [newPost, ...currentPosts]);
     setNewPostContent("");
@@ -225,17 +235,21 @@ export default function HomePage() {
           created_at: newPost.created_at,
         }),
       });
-  
+
       if (!response.ok) {
         // Remove the temp post on failure
-        setPosts((currentPosts) => currentPosts.filter((post) => post.id !== tempId));
+        setPosts((currentPosts) =>
+          currentPosts.filter((post) => post.id !== tempId)
+        );
         throw new Error("Failed to create post");
       }
-  
+
       const result = await response.json();
       // Just update the ID and any server-generated fields
       setPosts((currentPosts) =>
-        currentPosts.map((post) => (post.id === tempId ? { ...post, id: result.id } : post))
+        currentPosts.map((post) =>
+          post.id === tempId ? { ...post, id: result.id } : post
+        )
       );
     } catch (error) {
       console.error("Error creating post:", error);
@@ -258,7 +272,7 @@ export default function HomePage() {
     if (!user) return;
     const commentText = commentInputs[postId]?.trim();
     if (!commentText) return;
-  
+
     try {
       const token = await user.getIdToken();
       const newComment = {
@@ -268,27 +282,32 @@ export default function HomePage() {
         text: commentText,
         created_at: new Date().toISOString(),
       };
-  
+
       // Optimistic update
       setPosts((prevPosts) =>
         prevPosts.map((post) =>
-          post.id === postId ? { ...post, comments: [newComment, ...post.comments] } : post
+          post.id === postId
+            ? { ...post, comments: [newComment, ...post.comments] }
+            : post
         )
       );
       setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
-  
-      const response = await fetch(`/api/posts/comment?postId=${encodeURIComponent(postId)}`, {
-        method: "POST",
-        body: JSON.stringify({ 
-          text: commentText,
-          author: user.displayName || user.email || "Anonymous",
-        }),
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      
+
+      const response = await fetch(
+        `/api/posts/comment?postId=${encodeURIComponent(postId)}`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            text: commentText,
+            author: user.displayName || user.email || "Anonymous",
+          }),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
       // Only update the specific comment with the server response if needed
       if (response.ok) {
         const data = await response.json();
@@ -297,12 +316,14 @@ export default function HomePage() {
           setPosts((prevPosts) =>
             prevPosts.map((post) => {
               if (post.id !== postId) return post;
-              
+
               // Find and update the temporary comment with real data
-              const updatedComments = post.comments.map(comment => 
-                comment.id === newComment.id ? {...comment, id: data.id} : comment
+              const updatedComments = post.comments.map((comment) =>
+                comment.id === newComment.id
+                  ? { ...comment, id: data.id }
+                  : comment
               );
-              
+
               return { ...post, comments: updatedComments };
             })
           );
@@ -374,7 +395,7 @@ export default function HomePage() {
           <div className="md:col-span-1">
             <div className="bg-white rounded-lg shadow p-6 mb-4">
               <div className="flex flex-col items-center">
-                <div 
+                <div
                   className="w-24 h-24 bg-gradient-to-br from-green-100 bg-gray-100 rounded-full shadow-lg flex items-center justify-center text-5xl text-black cursor-pointer"
                   onClick={() => navigateToProfile(user.uid)}
                 >
@@ -392,11 +413,19 @@ export default function HomePage() {
                 </p>
 
                 <p className="text-sm mt-1 text-gray-500">
-                  Member since: {format(new Date(user.metadata?.creationTime || Date.now()), "yyyy")}
+                  Member since:{" "}
+                  {format(
+                    new Date(user.metadata?.creationTime || Date.now()),
+                    "yyyy"
+                  )}
                 </p>
                 <div className="flex justify-center space-x-4 mt-2 text-sm text-gray-600">
-                  <div><strong>{followersCount}</strong> followers</div>
-                  <div><strong>{followingCount}</strong> following</div>
+                  <div>
+                    <strong>{followersCount}</strong> followers
+                  </div>
+                  <div>
+                    <strong>{followingCount}</strong> following
+                  </div>
                 </div>
               </div>
 
@@ -411,6 +440,19 @@ export default function HomePage() {
                     <FaBriefcase className="mr-2 text-green-600" /> Find Jobs
                   </Link>
                   <Link
+                    href="/jobs/report"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                  >
+                    <Plus className="mr-2 text-green-600 h-4 w-4" /> Report Job
+                  </Link>
+                  <Link
+                    href="/jobs/verify"
+                    className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+                  >
+                    <ShieldCheck className="mr-2 text-green-600 h-4 w-4" />{" "}
+                    Verify Jobs
+                  </Link>
+                  <Link
                     href="/scrubby"
                     className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
                   >
@@ -420,7 +462,8 @@ export default function HomePage() {
                     href="/applications"
                     className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
                   >
-                    <FaRegClock className="mr-2 text-green-600" /> My Applications
+                    <FaRegClock className="mr-2 text-green-600" /> My
+                    Applications
                   </Link>
                   <Link
                     href="/saved"
@@ -431,7 +474,7 @@ export default function HomePage() {
                 </nav>
               </div>
             </div>
-            
+
             {/* Job Search Card */}
             <div className="bg-white rounded-lg shadow p-4 mb-4">
               <h2 className="font-semibold text-lg mb-3">Find Jobs</h2>
@@ -445,29 +488,33 @@ export default function HomePage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && search.trim()) {
-                        router.push(`/jobs?search=${encodeURIComponent(search.trim())}`);
+                      if (e.key === "Enter" && search.trim()) {
+                        router.push(
+                          `/jobs?search=${encodeURIComponent(search.trim())}`
+                        );
                       }
                     }}
                   />
                 </div>
-                <Button 
+                <Button
                   className="ml-2 bg-green-600 hover:bg-green-700"
                   onClick={() => {
                     if (search.trim()) {
-                      router.push(`/jobs?search=${encodeURIComponent(search.trim())}`);
+                      router.push(
+                        `/jobs?search=${encodeURIComponent(search.trim())}`
+                      );
                     } else {
-                      router.push('/jobs');
+                      router.push("/jobs");
                     }
                   }}
                 >
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full mt-3 text-green-700 border-green-200"
-                onClick={() => router.push('/jobs')}
+                onClick={() => router.push("/jobs")}
               >
                 View All Jobs
               </Button>
@@ -478,14 +525,18 @@ export default function HomePage() {
           <div className="md:col-span-2 space-y-6">
             {/* Create Post Card */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-800">What's on your mind?</h2>
+              <h2 className="text-lg font-semibold text-gray-800">
+                What's on your mind?
+              </h2>
               <textarea
                 className="w-full mt-3 p-3 rounded-lg border border-gray-300 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 transition"
                 rows={3}
                 value={newPostContent}
                 onChange={(e) => setNewPostContent(e.target.value)}
                 placeholder="Share your thoughts..."
-                onKeyDown={(e) => e.key === "Enter" && e.ctrlKey && handleAddPost()}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && e.ctrlKey && handleAddPost()
+                }
               />
               <Button
                 className="w-full mt-4 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white"
@@ -509,7 +560,10 @@ export default function HomePage() {
               </div>
             ) : (
               posts.map((post) => (
-                <Card key={post.id} className="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow bg-white">
+                <Card
+                  key={post.id}
+                  className="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow bg-white"
+                >
                   <CardContent className="p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <div
@@ -531,21 +585,31 @@ export default function HomePage() {
                       </div>
                     </div>
                     <div className="text-gray-800 mt-4 text-sm leading-relaxed whitespace-pre-wrap">
-                      <ReactMarkdown>
-                        {post.content}
-                      </ReactMarkdown>
+                      <ReactMarkdown>{post.content}</ReactMarkdown>
                     </div>
                     <div className="flex items-center gap-4 mt-4">
                       <Button
                         variant={post.userHasLiked ? "default" : "ghost"}
                         size="sm"
                         onClick={() => toggleLike(post.id)}
-                        className={post.userHasLiked ? "bg-pink-100 text-pink-500 hover:bg-pink-200" : ""}
+                        className={
+                          post.userHasLiked
+                            ? "bg-pink-100 text-pink-500 hover:bg-pink-200"
+                            : ""
+                        }
                       >
-                        <Heart className={`w-4 h-4 mr-1 ${post.userHasLiked ? "fill-pink-500" : ""}`} />
+                        <Heart
+                          className={`w-4 h-4 mr-1 ${
+                            post.userHasLiked ? "fill-pink-500" : ""
+                          }`}
+                        />
                         {post.likes || 0}
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => toggleCommentSection(post.id)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleCommentSection(post.id)}
+                      >
                         <MessageSquare className="w-4 h-4 mr-1" />
                         {post.comments?.length || 0}
                       </Button>
@@ -559,8 +623,12 @@ export default function HomePage() {
                             placeholder="Write a comment..."
                             className="flex-grow p-2 text-sm border border-gray-300 rounded-full focus:ring-2 focus:ring-green-400 transition-all"
                             value={commentInputs[post.id] || ""}
-                            onChange={(e) => handleCommentInputChange(post.id, e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && submitComment(post.id)}
+                            onChange={(e) =>
+                              handleCommentInputChange(post.id, e.target.value)
+                            }
+                            onKeyDown={(e) =>
+                              e.key === "Enter" && submitComment(post.id)
+                            }
                           />
                           <Button
                             size="sm"
@@ -572,23 +640,35 @@ export default function HomePage() {
                         </div>
                         {post.comments && post.comments.length > 0 ? (
                           post.comments.map((comment, idx) => (
-                            <div key={comment.id || idx} className="border-b last:border-0 py-2">
+                            <div
+                              key={comment.id || idx}
+                              className="border-b last:border-0 py-2"
+                            >
                               <div className="flex justify-between items-center">
                                 <p
                                   className="text-sm font-medium cursor-pointer hover:text-green-600 transition"
-                                  onClick={() => navigateToProfile(comment.author_uid)}
+                                  onClick={() =>
+                                    navigateToProfile(comment.author_uid)
+                                  }
                                 >
                                   {comment.author}
                                 </p>
                                 <p className="text-xs text-gray-400">
-                                  {format(new Date(comment.created_at), "MMM d, h:mm a")}
+                                  {format(
+                                    new Date(comment.created_at),
+                                    "MMM d, h:mm a"
+                                  )}
                                 </p>
                               </div>
-                              <p className="text-sm mt-1 text-gray-800">{comment.text}</p>
+                              <p className="text-sm mt-1 text-gray-800">
+                                {comment.text}
+                              </p>
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-gray-500">No comments yet. Be the first to comment!</p>
+                          <p className="text-sm text-gray-500">
+                            No comments yet. Be the first to comment!
+                          </p>
                         )}
                       </div>
                     )}
