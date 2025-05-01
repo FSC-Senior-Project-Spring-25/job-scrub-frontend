@@ -43,9 +43,9 @@ import {
 import { Job } from "@/types/types";
 import Link from "next/link";
 import { toast } from "sonner";
-import { useAuth } from "../auth-context";
 import AnimatedLogo from "@/components/animated-logo";
 import { useSearchParams } from "next/navigation";
+import { useAuth } from "../auth-context";
 
 // Map job type to a more readable format
 const jobTypeLabels = {
@@ -507,257 +507,248 @@ export default function JobsPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-4 text-center sm:text-left">
-          <span className="bg-green-700 text-white px-2 py-1 rounded mr-1">
-            Job
-          </span>
-          <span className="text-green-700">Listings</span>
-        </h1>
-        
-        {/* Search and filter section */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1 flex items-center border border-gray-300 rounded-lg bg-white px-4 py-2">
-              <Search className="text-gray-500 h-5 w-5" />
-              <input
-                type="text"
-                placeholder="Search job titles, companies, keywords..."
-                className="ml-2 flex-1 outline-none"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex gap-2 whitespace-nowrap">
-                  <Filter className="h-4 w-4" /> Filters
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[90vw] max-w-[700px] p-4" sideOffset={8}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <h4 className="font-medium mb-2">Job Type</h4>
-                    <div className="space-y-2">
-                      {Object.entries(filters.jobType).map(([type, checked]) => (
-                        <div key={type} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`job-type-${type}`}
-                            checked={checked}
-                            onCheckedChange={(isChecked) =>
-                              setFilters({
-                                ...filters,
-                                jobType: {
-                                  ...filters.jobType,
-                                  [type]: !!isChecked,
-                                },
-                              })
-                            }
-                          />
-                          <label
-                            htmlFor={`job-type-${type}`}
-                            className="text-sm capitalize"
-                          >
-                            {type === "fullTime" ? "Full Time" : 
-                             type === "partTime" ? "Part Time" : 
-                             type.replace(/([A-Z])/g, " $1").trim()}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
+    <>
+      {/* Search and filter section */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 flex items-center border border-gray-300 rounded-lg bg-white px-4 py-2">
+            <Search className="text-gray-500 h-5 w-5" />
+            <input
+              type="text"
+              placeholder="Search job titles, companies, keywords..."
+              className="ml-2 flex-1 outline-none"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="flex gap-2 whitespace-nowrap">
+                <Filter className="h-4 w-4" /> Filters
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[90vw] max-w-[700px] p-4" sideOffset={8}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <h4 className="font-medium mb-2">Job Type</h4>
+                  <div className="space-y-2">
+                    {Object.entries(filters.jobType).map(([type, checked]) => (
+                      <div key={type} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`job-type-${type}`}
+                          checked={checked}
+                          onCheckedChange={(isChecked) =>
+                            setFilters({
+                              ...filters,
+                              jobType: {
+                                ...filters.jobType,
+                                [type]: !!isChecked,
+                              },
+                            })
+                          }
+                        />
+                        <label
+                          htmlFor={`job-type-${type}`}
+                          className="text-sm capitalize"
+                        >
+                          {type === "fullTime" ? "Full Time" : 
+                           type === "partTime" ? "Part Time" : 
+                           type.replace(/([A-Z])/g, " $1").trim()}
+                        </label>
+                      </div>
+                    ))}
                   </div>
+                </div>
 
-                  <div>
-                    <h4 className="font-medium mb-2">Location Type</h4>
-                    <div className="space-y-2">
-                      {Object.entries(filters.locationType).map(([type, checked]) => (
-                        <div key={type} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`location-type-${type}`}
-                            checked={checked}
-                            onCheckedChange={(isChecked) =>
-                              setFilters({
-                                ...filters,
-                                locationType: {
-                                  ...filters.locationType,
-                                  [type]: !!isChecked,
-                                },
-                              })
-                            }
-                          />
-                          <label htmlFor={`location-type-${type}`} className="text-sm capitalize">
-                            {type}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium mb-2">Date Posted</h4>
-                    <select
-                      className="w-full p-2 border rounded-md text-sm"
-                      value={filters.datePosted}
-                      onChange={(e) =>
-                        setFilters({
-                          ...filters,
-                          datePosted: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="anytime">Anytime</option>
-                      <option value="24h">Last 24 hours</option>
-                      <option value="7d">Last 7 days</option>
-                      <option value="30d">Last 30 days</option>
-                    </select>
+                <div>
+                  <h4 className="font-medium mb-2">Location Type</h4>
+                  <div className="space-y-2">
+                    {Object.entries(filters.locationType).map(([type, checked]) => (
+                      <div key={type} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`location-type-${type}`}
+                          checked={checked}
+                          onCheckedChange={(isChecked) =>
+                            setFilters({
+                              ...filters,
+                              locationType: {
+                                ...filters.locationType,
+                                [type]: !!isChecked,
+                              },
+                            })
+                          }
+                        />
+                        <label htmlFor={`location-type-${type}`} className="text-sm capitalize">
+                          {type}
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </div>
                 
-                <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between gap-2">
-                  <div>
-                    <h4 className="font-medium mb-2">Distance (miles)</h4>
-                    <div className="flex items-center gap-4">
-                      <Slider
-                        className="w-[200px]"
-                        defaultValue={[filters.maxDistance]}
-                        value={[filters.maxDistance]}
-                        max={500}
-                        step={5}
-                        onValueChange={(value) =>
-                          setFilters({
-                            ...filters,
-                            maxDistance: value[0],
-                          })
-                        }
-                        disabled={!userLocation}
-                      />
-                      <span className="text-sm block min-w-[60px]">
-                        {filters.maxDistance} miles
-                      </span>
-                    </div>
-                    {!userLocation && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Set your location first to use distance filter
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row gap-2 sm:items-end sm:self-end">
-                    <Button variant="outline" size="sm" onClick={resetFilters}>
-                      Reset All
-                    </Button>
-                    <Button size="sm" onClick={getCurrentLocation}>
-                      <MapPinned className="w-4 h-4 mr-2" />
-                      Use My Location
-                    </Button>
-                  </div>
+                <div>
+                  <h4 className="font-medium mb-2">Date Posted</h4>
+                  <select
+                    className="w-full p-2 border rounded-md text-sm"
+                    value={filters.datePosted}
+                    onChange={(e) =>
+                      setFilters({
+                        ...filters,
+                        datePosted: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="anytime">Anytime</option>
+                    <option value="24h">Last 24 hours</option>
+                    <option value="7d">Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                  </select>
                 </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            
-            <Button onClick={fetchJobs} variant="ghost" className="whitespace-nowrap">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between gap-2">
+                <div>
+                  <h4 className="font-medium mb-2">Distance (miles)</h4>
+                  <div className="flex items-center gap-4">
+                    <Slider
+                      className="w-[200px]"
+                      defaultValue={[filters.maxDistance]}
+                      value={[filters.maxDistance]}
+                      max={500}
+                      step={5}
+                      onValueChange={(value) =>
+                        setFilters({
+                          ...filters,
+                          maxDistance: value[0],
+                        })
+                      }
+                      disabled={!userLocation}
+                    />
+                    <span className="text-sm block min-w-[60px]">
+                      {filters.maxDistance} miles
+                    </span>
+                  </div>
+                  {!userLocation && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Set your location first to use distance filter
+                    </p>
+                  )}
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-end sm:self-end">
+                  <Button variant="outline" size="sm" onClick={resetFilters}>
+                    Reset All
+                  </Button>
+                  <Button size="sm" onClick={getCurrentLocation}>
+                    <MapPinned className="w-4 h-4 mr-2" />
+                    Use My Location
+                  </Button>
+                </div>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
-          {/* Active filters display */}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {userLocation && (
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 flex gap-1 items-center">
-                <MapPin className="h-3 w-3" />
-                Within {filters.maxDistance} miles
-                <button className="ml-1 hover:text-blue-900" onClick={() => setUserLocation(null)}>×</button>
-              </Badge>
-            )}
-            
-            {Object.entries(filters.jobType)
-              .filter(([_, checked]) => checked)
-              .map(([type]) => (
-                <Badge key={type} variant="outline" className="bg-green-50 text-green-700 flex gap-1 items-center">
-                  <Briefcase className="h-3 w-3" />
-                  {type === "fullTime" ? "Full Time" : 
-                   type === "partTime" ? "Part Time" : 
-                   type.replace(/([A-Z])/g, " $1").trim()}
-                  <button 
-                    className="ml-1 hover:text-green-900" 
-                    onClick={() => 
-                      setFilters({
-                        ...filters,
-                        jobType: {
-                          ...filters.jobType,
-                          [type]: false,
-                        },
-                      })
-                    }
-                  >×</button>
-                </Badge>
-              ))}
-              
-            {Object.entries(filters.locationType)
-              .filter(([_, checked]) => checked)
-              .map(([type]) => (
-                <Badge key={type} variant="outline" className="bg-purple-50 text-purple-700 flex gap-1 items-center">
-                  <MapPin className="h-3 w-3" />
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                  <button 
-                    className="ml-1 hover:text-purple-900" 
-                    onClick={() => 
-                      setFilters({
-                        ...filters,
-                        locationType: {
-                          ...filters.locationType,
-                          [type]: false,
-                        },
-                      })
-                    }
-                  >×</button>
-                </Badge>
-              ))}
-              
-            {filters.datePosted !== "anytime" && (
-              <Badge variant="outline" className="bg-orange-50 text-orange-700 flex gap-1 items-center">
-                <Clock className="h-3 w-3" />
-                {filters.datePosted === "24h" ? "Last 24 hours" : 
-                 filters.datePosted === "7d" ? "Last 7 days" : 
-                 "Last 30 days"}
+          <Button onClick={fetchJobs} variant="ghost" className="whitespace-nowrap">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+        
+        {/* Active filters display */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {userLocation && (
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 flex gap-1 items-center">
+              <MapPin className="h-3 w-3" />
+              Within {filters.maxDistance} miles
+              <button className="ml-1 hover:text-blue-900" onClick={() => setUserLocation(null)}>×</button>
+            </Badge>
+          )}
+          
+          {Object.entries(filters.jobType)
+            .filter(([_, checked]) => checked)
+            .map(([type]) => (
+              <Badge key={type} variant="outline" className="bg-green-50 text-green-700 flex gap-1 items-center">
+                <Briefcase className="h-3 w-3" />
+                {type === "fullTime" ? "Full Time" : 
+                 type === "partTime" ? "Part Time" : 
+                 type.replace(/([A-Z])/g, " $1").trim()}
                 <button 
-                  className="ml-1 hover:text-orange-900" 
+                  className="ml-1 hover:text-green-900" 
                   onClick={() => 
                     setFilters({
                       ...filters,
-                      datePosted: "anytime",
+                      jobType: {
+                        ...filters.jobType,
+                        [type]: false,
+                      },
                     })
                   }
                 >×</button>
               </Badge>
-            )}
+            ))}
             
-            {(search || 
-              Object.values(filters.jobType).some(Boolean) || 
-              Object.values(filters.locationType).some(Boolean) ||
-              filters.datePosted !== "anytime" ||
-              userLocation) && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={resetFilters} 
-                className="text-gray-600 hover:text-gray-800"
-              >
-                Clear all filters
-              </Button>
-            )}
-          </div>
+          {Object.entries(filters.locationType)
+            .filter(([_, checked]) => checked)
+            .map(([type]) => (
+              <Badge key={type} variant="outline" className="bg-purple-50 text-purple-700 flex gap-1 items-center">
+                <MapPin className="h-3 w-3" />
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+                <button 
+                  className="ml-1 hover:text-purple-900" 
+                  onClick={() => 
+                    setFilters({
+                      ...filters,
+                      locationType: {
+                        ...filters.locationType,
+                        [type]: false,
+                      },
+                    })
+                  }
+                >×</button>
+              </Badge>
+            ))}
+            
+          {filters.datePosted !== "anytime" && (
+            <Badge variant="outline" className="bg-orange-50 text-orange-700 flex gap-1 items-center">
+              <Clock className="h-3 w-3" />
+              {filters.datePosted === "24h" ? "Last 24 hours" : 
+               filters.datePosted === "7d" ? "Last 7 days" : 
+               "Last 30 days"}
+              <button 
+                className="ml-1 hover:text-orange-900" 
+                onClick={() => 
+                  setFilters({
+                    ...filters,
+                    datePosted: "anytime",
+                  })
+                }
+              >×</button>
+            </Badge>
+          )}
+          
+          {(search || 
+            Object.values(filters.jobType).some(Boolean) || 
+            Object.values(filters.locationType).some(Boolean) ||
+            filters.datePosted !== "anytime" ||
+            userLocation) && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={resetFilters} 
+              className="text-gray-600 hover:text-gray-800"
+            >
+              Clear all filters
+            </Button>
+          )}
         </div>
-        
-        {/* Results summary */}
-        <div className="mb-4 flex justify-between items-center">
-          <div className="text-gray-600">
-            Showing {filteredCount > 0 ? `1-${Math.min(currentJobs.length, jobsPerPage)} of ${filteredCount}` : "0"} jobs
-            {search ? ` matching "${search}"` : ""}
-          </div>
+      </div>
+      
+      {/* Results summary */}
+      <div className="mb-4 flex justify-between items-center">
+        <div className="text-gray-600">
+          Showing {filteredCount > 0 ? `1-${Math.min(currentJobs.length, jobsPerPage)} of ${filteredCount}` : "0"} jobs
+          {search ? ` matching "${search}"` : ""}
         </div>
       </div>
 
@@ -940,6 +931,6 @@ export default function JobsPage() {
           </Pagination>
         )}
       </div>
-    </div>
+    </>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useAuth } from "../auth-context";
+import { useAuth } from "../../auth-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
