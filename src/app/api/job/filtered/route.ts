@@ -1,38 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
-interface Location {
-  address?: string;
-  lat?: number;
-  lon?: number;
-}
-
-enum LocationType {
-  REMOTE = "remote",
-  ONSITE = "onsite",
-  HYBRID = "hybrid",
-}
-
-enum JobType {
-  FULL_TIME = "fulltime",
-  PART_TIME = "parttime",
-  INTERNSHIP = "internship",
-  CONTRACT = "contract",
-  VOLUNTEER = "volunteer",
-}
-
-interface JobMetadata {
-  title?: string;
-  company?: string;
-  url?: string;
-  description?: string;
-  jobType?: JobType;
-  skills?: string[];
-  location?: Location;
-  locationType?: LocationType;
-  benefits?: string[];
-  date?: string;
-  salary?: string;
-  verified?: boolean;
+interface Job {
+  id: string;
+  metadata: {
+    title: string;
+    company: string;
+    url: string;
+    description: string;
+    jobType: string;
+    skills: string[];
+    location: {
+      address: string;
+      lat: number;
+      lon: number;
+    };
+    locationType: string;
+    benefits: string[];
+    date: string;
+  };
 }
 
 interface FilterParams {
@@ -93,24 +78,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const data = await response.json();
+    const jobs: Job[] = await response.json();
 
-    const jobMap = data.reduce((acc: Record<string, JobMetadata>, job: any) => {
-      acc[job.id] = job.metadata;
-      return acc;
-    }, {});
-
-    const filteredJobs = Object.entries(jobMap).filter(([jobId, job]) => {
-      if (!job) return false;
-
-      // Search filter with null checks
+    // Filter jobs based on criteria
+    const filteredJobs = jobs.filter(job => {
+      const jobData = job.metadata; // Access the metadata object
+      
+      // Search filter
       const searchLower = search.toLowerCase();
-      const matchesSearch =
-        (job.title?.toLowerCase() || "").includes(searchLower) ||
-        (job.company?.toLowerCase() || "").includes(searchLower) ||
-        (job.description?.toLowerCase() || "").includes(searchLower) ||
-        (job.skills || []).some((skill) =>
-          (skill?.toLowerCase() || "").includes(searchLower)
+      const matchesSearch = search === "" || 
+        jobData.title.toLowerCase().includes(searchLower) ||
+        jobData.company.toLowerCase().includes(searchLower) ||
+        jobData.description.toLowerCase().includes(searchLower) ||
+        (jobData.skills || []).some(skill => 
+          skill.toLowerCase().includes(searchLower)
         );
 
       // Job type filter
@@ -120,19 +101,18 @@ export async function POST(req: NextRequest) {
 
       const matchesJobType =
         activeJobTypes.length === 0 ||
-        activeJobTypes.some((type) => {
-          if (!job.jobType) return false;
+        activeJobTypes.some(type => {
           switch (type) {
             case "fullTime":
-              return job.jobType === JobType.FULL_TIME;
+              return jobData.jobType === "fulltime";
             case "partTime":
-              return job.jobType === JobType.PART_TIME;
+              return jobData.jobType === "parttime";
             case "internship":
-              return job.jobType === JobType.INTERNSHIP;
+              return jobData.jobType === "internship";
             case "contract":
-              return job.jobType === JobType.CONTRACT;
+              return jobData.jobType === "contract";
             case "volunteer":
-              return job.jobType === JobType.VOLUNTEER;
+              return jobData.jobType === "volunteer";
             default:
               return false;
           }
@@ -145,15 +125,14 @@ export async function POST(req: NextRequest) {
 
       const matchesLocationType =
         activeLocationTypes.length === 0 ||
-        activeLocationTypes.some((type) => {
-          if (!job.locationType) return false;
+        activeLocationTypes.some(type => {
           switch (type) {
             case "remote":
-              return job.locationType === LocationType.REMOTE;
+              return jobData.locationType === "remote";
             case "onsite":
-              return job.locationType === LocationType.ONSITE;
+              return jobData.locationType === "onsite";
             case "hybrid":
-              return job.locationType === LocationType.HYBRID;
+              return jobData.locationType === "hybrid";
             default:
               return false;
           }
@@ -163,45 +142,37 @@ export async function POST(req: NextRequest) {
       let withinDistance = true;
       if (
         userLocation &&
-        job.locationType !== LocationType.REMOTE &&
-        job.location?.lat &&
-        job.location?.lon
+        jobData.locationType !== "remote" &&
+        jobData.location?.lat && 
+        jobData.location?.lon &&
+        maxDistance > 0
       ) {
-        try {
-          const distance = calculateDistance(
-            userLocation.lat,
-            userLocation.lng,
-            job.location.lat,
-            job.location.lon
-          );
-          withinDistance = distance <= maxDistance;
-        } catch {
-          withinDistance = true;
-        }
+        const distance = calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          jobData.location.lat,
+          jobData.location.lon
+        );
+        withinDistance = distance <= maxDistance;
       }
 
       // Date filter
       let matchesDatePosted = true;
-      if (job.date && datePosted !== "anytime") {
-        try {
-          const now = new Date();
-          const jobDate = new Date(job.date);
-          const diffHours =
-            (now.getTime() - jobDate.getTime()) / (1000 * 60 * 60);
+      if (jobData.date && datePosted !== "anytime") {
+        const now = new Date();
+        const jobDate = new Date(jobData.date);
+        const diffHours = (now.getTime() - jobDate.getTime()) / (1000 * 60 * 60);
 
-          switch (datePosted) {
-            case "24h":
-              matchesDatePosted = diffHours <= 24;
-              break;
-            case "7d":
-              matchesDatePosted = diffHours <= 168;
-              break;
-            case "30d":
-              matchesDatePosted = diffHours <= 720;
-              break;
-          }
-        } catch {
-          matchesDatePosted = true;
+        switch (datePosted) {
+          case "24h":
+            matchesDatePosted = diffHours <= 24;
+            break;
+          case "7d":
+            matchesDatePosted = diffHours <= 168;
+            break;
+          case "30d":
+            matchesDatePosted = diffHours <= 720;
+            break;
         }
       }
 
@@ -214,8 +185,13 @@ export async function POST(req: NextRequest) {
       );
     });
 
-    const result = Object.fromEntries(filteredJobs);
-    return NextResponse.json(result);
+    // Transform the filteredJobs to flatten the structure for the response
+    const transformedJobs = filteredJobs.map(job => ({
+      id: job.id,
+      ...job.metadata
+    }));
+
+    return NextResponse.json(transformedJobs);
   } catch (error) {
     console.error("Error filtering jobs:", error);
     return NextResponse.json(

@@ -67,6 +67,7 @@ export default function JobsPage() {
     lng: number;
   } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [tempDistance, setTempDistance] = useState(50);
   const [filters, setFilters] = useState({
     jobType: {
       internship: false,
@@ -88,7 +89,7 @@ export default function JobsPage() {
   const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") || "");
-  
+
   // Process URL search params on initial load
   useEffect(() => {
     const searchQuery = searchParams.get("search");
@@ -103,26 +104,6 @@ export default function JobsPage() {
       fetchJobs(); // Default fetch all jobs if no search param
     }
   }, [searchParams]); // Re-run when URL parameters change
-
-  // Calculate distance between two coordinates
-  const calculateDistance = (
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number
-  ) => {
-    const R = 3958.8; // earth radius in miles
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
 
   // Get user's current location
   const getCurrentLocation = () => {
@@ -151,6 +132,10 @@ export default function JobsPage() {
     }
   };
 
+  useEffect(() => {
+    setTempDistance(filters.maxDistance);
+  }, [filters.maxDistance]);
+
   // Reset all filters and fetch all jobs
   const resetFilters = () => {
     setFilters({
@@ -170,15 +155,12 @@ export default function JobsPage() {
       maxDistance: 50,
       datePosted: "anytime",
     });
+    setTempDistance(50);
     setSearch("");
     setUserLocation(null);
     setLocationError(null);
     fetchJobs();
   };
-
-  useEffect(() => {
-    fetchJobs();
-  }, []);
 
   // Fetch filtered jobs based on current filters
   const fetchFilteredJobs = async () => {
@@ -202,18 +184,17 @@ export default function JobsPage() {
       if (!response.ok) {
         throw new Error("Failed to fetch filtered jobs");
       }
-      
+
       const data = await response.json();
-      
+
       // Transform the data to match the Job interface
       const transformedJobs = processJobData(data);
-      
+
       setJobs(transformedJobs);
-      
+
       // Safely calculate total pages
       const jobCount = transformedJobs?.length || 0;
       setTotalPages(Math.max(1, Math.ceil(jobCount / jobsPerPage)));
-      
     } catch (error) {
       console.error("Error filtering jobs:", error);
       toast.error("Failed to apply filters");
@@ -223,7 +204,7 @@ export default function JobsPage() {
       setLoading(false);
     }
   };
-  
+
   const debounce = (func: Function, delay: number) => {
     let timeoutId: NodeJS.Timeout;
     return (...args: any[]) => {
@@ -245,10 +226,10 @@ export default function JobsPage() {
       }
 
       const data = await response.json();
-      
+
       // Transform the data to match the Job interface
       const transformedJobs = processJobData(data);
-      
+
       setJobs(transformedJobs);
 
       // Safely calculate total pages
@@ -264,12 +245,12 @@ export default function JobsPage() {
       setLoading(false);
     }
   };
-  
+
   // Process job data from API response
   const processJobData = (data: any): Job[] => {
     if (!Array.isArray(data)) {
       // Handle case where data might be an object with job IDs as keys
-      if (data && typeof data === 'object') {
+      if (data && typeof data === "object") {
         return Object.entries(data).map(([id, job]: [string, any]) => {
           const jobData = job.metadata || job;
           return transformJobData(id, jobData);
@@ -277,7 +258,7 @@ export default function JobsPage() {
       }
       return [];
     }
-    
+
     // Handle array format
     return data.map((item: any) => {
       const id = item.id || "";
@@ -285,7 +266,7 @@ export default function JobsPage() {
       return transformJobData(id, jobData);
     });
   };
-  
+
   // Transform raw job data to match Job interface
   const transformJobData = (id: string, jobData: any): Job => {
     return {
@@ -315,12 +296,13 @@ export default function JobsPage() {
       search ||
       Object.values(filters.jobType).some(Boolean) ||
       Object.values(filters.locationType).some(Boolean) ||
-      filters.maxDistance !== 50 ||
-      filters.datePosted !== "anytime" ||
-      userLocation !== null;
+      (userLocation && filters.maxDistance > 0 && filters.maxDistance !== 50) ||
+      filters.datePosted !== "anytime";
 
     if (hasActiveFilters) {
       debouncedFetchFilteredJobs();
+    } else if (!hasActiveFilters && (jobs.length === 0 || search === "")) {
+      fetchJobs();
     }
   }, [search, filters, userLocation]);
 
@@ -345,17 +327,20 @@ export default function JobsPage() {
   // Filter jobs based on criteria
   const filterJobs = (jobs: Job[]) => {
     if (!Array.isArray(jobs)) return [];
-    
+
     return jobs.filter((job) => {
       if (!job) return false;
 
       // Search filter
       const searchLower = search.toLowerCase();
-      const matchesSearch = !searchLower || 
+      const matchesSearch =
+        !searchLower ||
         job.title?.toLowerCase().includes(searchLower) ||
         job.company?.toLowerCase().includes(searchLower) ||
         job.description?.toLowerCase().includes(searchLower) ||
-        job.skills?.some((skill) => skill.toLowerCase().includes(searchLower)) ||
+        job.skills?.some((skill) =>
+          skill.toLowerCase().includes(searchLower)
+        ) ||
         false;
 
       return matchesSearch;
@@ -385,7 +370,10 @@ export default function JobsPage() {
   const generatePaginationItems = () => {
     const items = [];
     const maxVisiblePages = 5;
-    const calculatedTotalPages = Math.max(1, Math.ceil(filteredCount / jobsPerPage));
+    const calculatedTotalPages = Math.max(
+      1,
+      Math.ceil(filteredCount / jobsPerPage)
+    );
 
     if (calculatedTotalPages <= maxVisiblePages) {
       for (let i = 1; i <= calculatedTotalPages; i++) {
@@ -521,14 +509,21 @@ export default function JobsPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="flex gap-2 whitespace-nowrap">
+              <Button
+                variant="outline"
+                className="flex gap-2 whitespace-nowrap"
+              >
                 <Filter className="h-4 w-4" /> Filters
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[90vw] max-w-[700px] p-4" sideOffset={8}>
+            <DropdownMenuContent
+              align="end"
+              className="w-[90vw] max-w-[700px] p-4"
+              sideOffset={8}
+            >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <h4 className="font-medium mb-2">Job Type</h4>
@@ -552,9 +547,11 @@ export default function JobsPage() {
                           htmlFor={`job-type-${type}`}
                           className="text-sm capitalize"
                         >
-                          {type === "fullTime" ? "Full Time" : 
-                           type === "partTime" ? "Part Time" : 
-                           type.replace(/([A-Z])/g, " $1").trim()}
+                          {type === "fullTime"
+                            ? "Full Time"
+                            : type === "partTime"
+                            ? "Part Time"
+                            : type.replace(/([A-Z])/g, " $1").trim()}
                         </label>
                       </div>
                     ))}
@@ -564,29 +561,34 @@ export default function JobsPage() {
                 <div>
                   <h4 className="font-medium mb-2">Location Type</h4>
                   <div className="space-y-2">
-                    {Object.entries(filters.locationType).map(([type, checked]) => (
-                      <div key={type} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`location-type-${type}`}
-                          checked={checked}
-                          onCheckedChange={(isChecked) =>
-                            setFilters({
-                              ...filters,
-                              locationType: {
-                                ...filters.locationType,
-                                [type]: !!isChecked,
-                              },
-                            })
-                          }
-                        />
-                        <label htmlFor={`location-type-${type}`} className="text-sm capitalize">
-                          {type}
-                        </label>
-                      </div>
-                    ))}
+                    {Object.entries(filters.locationType).map(
+                      ([type, checked]) => (
+                        <div key={type} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`location-type-${type}`}
+                            checked={checked}
+                            onCheckedChange={(isChecked) =>
+                              setFilters({
+                                ...filters,
+                                locationType: {
+                                  ...filters.locationType,
+                                  [type]: !!isChecked,
+                                },
+                              })
+                            }
+                          />
+                          <label
+                            htmlFor={`location-type-${type}`}
+                            className="text-sm capitalize"
+                          >
+                            {type}
+                          </label>
+                        </div>
+                      )
+                    )}
                   </div>
                 </div>
-                
+
                 <div>
                   <h4 className="font-medium mb-2">Date Posted</h4>
                   <select
@@ -606,76 +608,124 @@ export default function JobsPage() {
                   </select>
                 </div>
               </div>
-              
+
               <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between gap-2">
-                <div>
+                <div className="flex flex-col">
                   <h4 className="font-medium mb-2">Distance (miles)</h4>
                   <div className="flex items-center gap-4">
                     <Slider
-                      className="w-[200px]"
+                      className={`w-[200px] ${!userLocation ? "opacity-50" : ""}`}
                       defaultValue={[filters.maxDistance]}
-                      value={[filters.maxDistance]}
+                      value={[tempDistance]}
                       max={500}
+                      min={1}
                       step={5}
-                      onValueChange={(value) =>
+                      onValueChange={(value) => {
+                        setTempDistance(value[0]);
+                      }}
+                      onValueCommit={(value) => {
+                        if (!userLocation) {
+                          // If user tries to use slider without location, prompt them
+                          toast.info("Please enable location to use distance filtering", {
+                            action: {
+                              label: "Enable Location",
+                              onClick: () => getCurrentLocation()
+                            }
+                          });
+                          return;
+                        }
+                        
+                        // Only when the user releases the slider, update the actual filter
                         setFilters({
                           ...filters,
                           maxDistance: value[0],
-                        })
-                      }
+                        });
+                      }}
                       disabled={!userLocation}
                     />
                     <span className="text-sm block min-w-[60px]">
-                      {filters.maxDistance} miles
+                      {tempDistance} miles
                     </span>
                   </div>
-                  {!userLocation && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Set your location first to use distance filter
+                  
+                  {!userLocation ? (
+                    <div className="mt-2">
+                      <p className="text-xs text-amber-500 flex items-center mb-1">
+                        <MapPin className="h-3 w-3 mr-1" /> 
+                        Location access needed for distance filtering
+                      </p>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="text-xs py-1 h-auto" 
+                        onClick={getCurrentLocation}
+                      >
+                        <MapPinned className="w-3 h-3 mr-1" />
+                        Enable Location
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-green-600 flex items-center mt-1">
+                      <MapPin className="h-3 w-3 mr-1" /> 
+                      Using your current location
                     </p>
                   )}
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row gap-2 sm:items-end sm:self-end">
-                  <Button variant="outline" size="sm" onClick={resetFilters}>
+                  <Button variant="default" size="sm" onClick={resetFilters}>
                     Reset All
-                  </Button>
-                  <Button size="sm" onClick={getCurrentLocation}>
-                    <MapPinned className="w-4 h-4 mr-2" />
-                    Use My Location
                   </Button>
                 </div>
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
-          
-          <Button onClick={fetchJobs} variant="ghost" className="whitespace-nowrap">
+
+          <Button
+            onClick={fetchJobs}
+            variant="ghost"
+            className="whitespace-nowrap"
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
         </div>
-        
+
         {/* Active filters display */}
         <div className="mt-3 flex flex-wrap gap-2">
           {userLocation && (
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 flex gap-1 items-center">
+            <Badge
+              variant="outline"
+              className="bg-blue-50 text-blue-700 flex gap-1 items-center"
+            >
               <MapPin className="h-3 w-3" />
               Within {filters.maxDistance} miles
-              <button className="ml-1 hover:text-blue-900" onClick={() => setUserLocation(null)}>×</button>
+              <button
+                className="ml-1 hover:text-blue-900"
+                onClick={() => setUserLocation(null)}
+              >
+                ×
+              </button>
             </Badge>
           )}
-          
+
           {Object.entries(filters.jobType)
             .filter(([_, checked]) => checked)
             .map(([type]) => (
-              <Badge key={type} variant="outline" className="bg-green-50 text-green-700 flex gap-1 items-center">
+              <Badge
+                key={type}
+                variant="outline"
+                className="bg-green-50 text-green-700 flex gap-1 items-center"
+              >
                 <Briefcase className="h-3 w-3" />
-                {type === "fullTime" ? "Full Time" : 
-                 type === "partTime" ? "Part Time" : 
-                 type.replace(/([A-Z])/g, " $1").trim()}
-                <button 
-                  className="ml-1 hover:text-green-900" 
-                  onClick={() => 
+                {type === "fullTime"
+                  ? "Full Time"
+                  : type === "partTime"
+                  ? "Part Time"
+                  : type.replace(/([A-Z])/g, " $1").trim()}
+                <button
+                  className="ml-1 hover:text-green-900"
+                  onClick={() =>
                     setFilters({
                       ...filters,
                       jobType: {
@@ -684,19 +734,25 @@ export default function JobsPage() {
                       },
                     })
                   }
-                >×</button>
+                >
+                  ×
+                </button>
               </Badge>
             ))}
-            
+
           {Object.entries(filters.locationType)
             .filter(([_, checked]) => checked)
             .map(([type]) => (
-              <Badge key={type} variant="outline" className="bg-purple-50 text-purple-700 flex gap-1 items-center">
+              <Badge
+                key={type}
+                variant="outline"
+                className="bg-purple-50 text-purple-700 flex gap-1 items-center"
+              >
                 <MapPin className="h-3 w-3" />
                 {type.charAt(0).toUpperCase() + type.slice(1)}
-                <button 
-                  className="ml-1 hover:text-purple-900" 
-                  onClick={() => 
+                <button
+                  className="ml-1 hover:text-purple-900"
+                  onClick={() =>
                     setFilters({
                       ...filters,
                       locationType: {
@@ -705,37 +761,46 @@ export default function JobsPage() {
                       },
                     })
                   }
-                >×</button>
+                >
+                  ×
+                </button>
               </Badge>
             ))}
-            
+
           {filters.datePosted !== "anytime" && (
-            <Badge variant="outline" className="bg-orange-50 text-orange-700 flex gap-1 items-center">
+            <Badge
+              variant="outline"
+              className="bg-orange-50 text-orange-700 flex gap-1 items-center"
+            >
               <Clock className="h-3 w-3" />
-              {filters.datePosted === "24h" ? "Last 24 hours" : 
-               filters.datePosted === "7d" ? "Last 7 days" : 
-               "Last 30 days"}
-              <button 
-                className="ml-1 hover:text-orange-900" 
-                onClick={() => 
+              {filters.datePosted === "24h"
+                ? "Last 24 hours"
+                : filters.datePosted === "7d"
+                ? "Last 7 days"
+                : "Last 30 days"}
+              <button
+                className="ml-1 hover:text-orange-900"
+                onClick={() =>
                   setFilters({
                     ...filters,
                     datePosted: "anytime",
                   })
                 }
-              >×</button>
+              >
+                ×
+              </button>
             </Badge>
           )}
-          
-          {(search || 
-            Object.values(filters.jobType).some(Boolean) || 
+
+          {(search ||
+            Object.values(filters.jobType).some(Boolean) ||
             Object.values(filters.locationType).some(Boolean) ||
             filters.datePosted !== "anytime" ||
             userLocation) && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={resetFilters} 
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
               className="text-gray-600 hover:text-gray-800"
             >
               Clear all filters
@@ -743,11 +808,18 @@ export default function JobsPage() {
           )}
         </div>
       </div>
-      
+
       {/* Results summary */}
       <div className="mb-4 flex justify-between items-center">
         <div className="text-gray-600">
-          Showing {filteredCount > 0 ? `1-${Math.min(currentJobs.length, jobsPerPage)} of ${filteredCount}` : "0"} jobs
+          Showing{" "}
+          {filteredCount > 0
+            ? `1-${Math.min(
+                currentJobs.length,
+                jobsPerPage
+              )} of ${filteredCount}`
+            : "0"}{" "}
+          jobs
           {search ? ` matching "${search}"` : ""}
         </div>
       </div>
@@ -763,13 +835,10 @@ export default function JobsPage() {
               No jobs found
             </h2>
             <p className="text-gray-500 mt-2">
-              Try adjusting your search criteria or filters to find more opportunities.
+              Try adjusting your search criteria or filters to find more
+              opportunities.
             </p>
-            <Button 
-              onClick={resetFilters}
-              variant="outline" 
-              className="mt-4"
-            >
+            <Button onClick={resetFilters} variant="outline" className="mt-4">
               Reset all filters
             </Button>
           </div>
@@ -840,7 +909,10 @@ export default function JobsPage() {
                       </Badge>
                     ))}
                     {job.skills.length > 5 && (
-                      <Badge variant="outline" className="bg-green-50 text-green-700">
+                      <Badge
+                        variant="outline"
+                        className="bg-green-50 text-green-700"
+                      >
                         +{job.skills.length - 5} more
                       </Badge>
                     )}
