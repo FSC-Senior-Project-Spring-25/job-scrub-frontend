@@ -1,5 +1,5 @@
 "use client";
-export const unstable_runtimeJS = true;
+
 import Link from "next/link";
 import ApplicationBadge from "@/components/job/application-badge";
 import SavedJobsBadge from '@/components/job/saved-badge';
@@ -11,22 +11,122 @@ import {
   FaMapMarkerAlt,
   FaBriefcase,
   FaDollarSign,
+  FaFilter,
+  FaLocationArrow,
 } from "react-icons/fa";
 import { toast } from "sonner";
 import { useAuth } from "./auth-context";
 import { Job } from "@/types/types";
 import AnimatedLogo from "@/components/animated-logo";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { json } from "stream/consumers";
+
 export default function HomePage() {
   const [search, setSearch] = useState("");
   const [jobs, setJobs] = useState<Record<string, Job>>({});
   const [isLoading, setIsLoading] = useState(false);
   const { user, loading } = useAuth();
-  // Fetch jobs when the component mounts and user is authenticated
-  useEffect(() => {
-    if (user) {
-      fetchJobs();
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [filters, setFilters] = useState({
+    jobType: {
+      internship: false,
+      fullTime: false,
+      partTime: false,
+      contract: false,
+      volunteer: false,
+    },
+    locationType: {
+      remote: false,
+      hybrid: false,
+      onsite: false,
+    },
+    maxDistance: 50, // in miles
+    datePosted: "anytime",
+  });
+
+  // Calculate distance between two coordinates
+  const calculateDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ) => {
+    const R = 3958.8; // earth radius in miles
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Get user's current location
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      setIsLoading(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+          setLocationError(null);
+          toast.success("Location obtained successfully");
+          setIsLoading(false);
+        },
+        (error) => {
+          setLocationError("Could not get your location");
+          toast.error("Location access denied");
+          setIsLoading(false);
+        },
+        { timeout: 10000 }
+      );
+    } else {
+      setLocationError("Geolocation not supported");
+      toast.error("Browser doesn't support geolocation");
     }
-  }, [user]);
+  };
+
+  // Reset all filters and fetch all jobs
+  const resetFilters = () => {
+    setFilters({
+      jobType: {
+        internship: false,
+        fullTime: false,
+        partTime: false,
+        contract: false,
+        volunteer: false,
+      },
+      locationType: {
+        remote: false,
+        hybrid: false,
+        onsite: false,
+      },
+      maxDistance: 50,
+      datePosted: "anytime",
+    });
+    setSearch("");
+    setUserLocation(null);
+    setLocationError(null);
+    fetchJobs();
+  };
+
   const fetchJobs = async () => {
     setIsLoading(true);
     try {
@@ -40,16 +140,87 @@ export default function HomePage() {
       setIsLoading(false);
     }
   };
+
+  // Fetch filtered jobs based on current filters
+  const fetchFilteredJobs = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/job/filtered", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          search: search || "",
+          jobType: filters.jobType,
+          locationType: filters.locationType,
+          maxDistance: filters.maxDistance,
+          datePosted: filters.datePosted,
+          userLocation,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch filtered jobs");
+      }
+      const jsonResponse = await response.json();
+      console.log(jsonResponse);
+      setJobs(jsonResponse || {});
+    } catch (error) {
+      console.error("Error filtering jobs:", error);
+      toast.error("Failed to apply filters");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const debounce = (func: Function, delay: number) => {
+    let timeoutId: NodeJS.Timeout;
+    return (...args: any[]) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => func(...args), delay);
+    };
+  };
+
+  const debouncedFetchFilteredJobs = debounce(fetchFilteredJobs, 500);
+
+  // Load initial jobs when user is available
+  useEffect(() => {
+    if (user) {
+      fetchJobs();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      const hasActiveFilters =
+        search ||
+        Object.values(filters.jobType).some(Boolean) ||
+        Object.values(filters.locationType).some(Boolean) ||
+        filters.maxDistance !== 50 ||
+        filters.datePosted !== "anytime";
+
+      if (hasActiveFilters) {
+        debouncedFetchFilteredJobs();
+      } else {
+        // When no filters are active, show all jobs
+        fetchJobs();
+      }
+    }
+  }, [search, filters, userLocation, user]);
+
   // Format salary for display
   const formatSalary = (salary: string) => {
     const salaryNum = parseInt(salary);
     if (isNaN(salaryNum)) return "Salary not specified";
+
     if (salaryNum >= 1000) {
       return `$${(salaryNum / 1000).toFixed(0)}k`;
     }
     return `$${salaryNum}`;
   };
-  // Format date to show days ago
+
+  // Format date for display
   const formatDate = (dateString: string) => {
     const jobDate = new Date(dateString);
     const today = new Date();
@@ -60,18 +231,19 @@ export default function HomePage() {
     if (diffDays === 1) return "Yesterday";
     return `${diffDays} days ago`;
   };
+
   // Filter jobs based on search
-  const filteredJobs = Object.entries(jobs).filter(([id, job]) => {
-    if (!job || typeof job !== 'object') return false;
-    const searchLower = search.toLowerCase();
-    return (
-      job.title.toLowerCase().includes(searchLower) ||
-      job.company.toLowerCase().includes(searchLower) ||
-      job.description.toLowerCase().includes(searchLower) ||
-      job.skills.some((skill) => skill.toLowerCase().includes(searchLower))
-    );
-  });
-  // If still loading auth state, show a simple loading indicator
+const filteredJobs = Object.entries(jobs).filter(([id, job]) => {
+  if (!job || typeof job !== 'object') return false;
+  const searchLower = search.toLowerCase();
+  return (
+    job.title.toLowerCase().includes(searchLower) ||
+    job.company.toLowerCase().includes(searchLower) ||
+    job.description.toLowerCase().includes(searchLower) ||
+    job.skills.some((skill) => skill.toLowerCase().includes(searchLower))
+  );
+});
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
@@ -79,6 +251,8 @@ export default function HomePage() {
       </div>
     );
   }
+
+
 // 2. Not logged in (welcome page + scrubby)
 if (!user) {
   return (
@@ -102,6 +276,8 @@ if (!user) {
         </Link>
       </div>
 
+
+  
       {/* Right side: text */}
       <div className="flex-1 flex flex-col items-center text-center">
         <div className="max-w-xl mx-auto">
@@ -142,36 +318,43 @@ if (!user) {
   );
 }
 
-// If user is logged in, show the dashboard/main application
-return (
-  <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col">
+   // If user is logged in, show the dashboard/main application
+ return (
+  <div className="min-h-screen bg-gray-100 flex flex-col">
+    {/* Main content */}
     <main className="flex-1 container mx-auto px-4 py-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Sidebar */}
         <div className="md:col-span-1">
-          <div className="sticky top-24 bg-white dark:bg-card dark:text-foreground rounded-lg shadow p-4 border border-gray-300 dark:border-muted">
+          <div className="bg-white rounded-lg shadow p-4">
             <h2 className="font-semibold text-lg mb-4">Quick Links</h2>
             <nav className="space-y-2">
-              <ApplicationBadge />
-              <SavedJobsBadge />
+            <ApplicationBadge />
+            <SavedJobsBadge />
+              {/*<Link
+                href="/applications"
+                className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+              >
+                <FaRegClock className="mr-2" /> My Job Applications
+              </Link>8 
+              */}
             </nav>
           </div>
         </div>
-
-        {/* Main Content */}
+        {/* Main content area */}
         <div className="md:col-span-2">
           {/* Search Bar */}
-          <div className="bg-white dark:bg-card dark:text-foreground rounded-lg shadow p-4 mb-6 border border-gray-300 dark:border-muted">
+          <div className="bg-white rounded-lg shadow p-4 mb-6">
             <h2 className="text-lg font-semibold mb-3">
               Find Your Next Opportunity
             </h2>
             <div className="flex items-center">
-              <div className="flex-1 flex items-center border-2 border-gray-300 dark:border-muted rounded-lg bg-white dark:bg-muted px-4 py-2">
-                <FaSearch className="text-gray-300 dark:text-gray-400" />
+              <div className="flex-1 flex items-center border border-gray-300 rounded-lg bg-white px-4 py-2">
+                <FaSearch className="text-gray-500" />
                 <input
                   type="text"
                   placeholder="Search for job titles, companies, or keywords"
-                  className="ml-2 flex-1 outline-none bg-transparent text-gray-800 dark:text-gray-200"
+                  className="ml-2 flex-1 outline-none"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -187,22 +370,23 @@ return (
                 Search
               </button>
             </div>
-
-            {/* Tags */}
             <div className="flex flex-wrap gap-2 mt-3">
-              {["Remote", "Full-time", "Part-time", "Tech"].map((tag) => (
-                <button
-                  key={tag}
-                  className="px-3 py-1 border border-gray-300 dark:border-muted bg-gray-100 dark:bg-muted text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-muted-foreground"
-                >
-                  {tag}
-                </button>
-              ))}
+              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
+                Remote
+              </button>
+              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
+                Full-time
+              </button>
+              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
+                Part-time
+              </button>
+              <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200">
+                Tech
+              </button>
             </div>
           </div>
-
           {/* Job Listings */}
-          <div className="bg-white dark:bg-card dark:text-foreground rounded-lg shadow p-6 border border-gray-300 dark:border-muted">
+          <div className="bg-white rounded-lg shadow p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Job Listings</h2>
               <button
@@ -212,69 +396,64 @@ return (
                 Refresh
               </button>
             </div>
-
             {isLoading ? (
               <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-2 border-green-600"></div>
-                <p className="mt-2 text-gray-600 dark:text-muted-foreground">Loading jobs...</p>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-600"></div>
+                <p className="mt-2 text-gray-600">Loading jobs...</p>
               </div>
             ) : filteredJobs.length > 0 ? (
               <div className="space-y-4">
                 {filteredJobs.map(([jobId, job]) => (
                   <div
                     key={jobId}
-                    className="border-2 border-gray-300 dark:border-muted rounded-lg p-4 hover:shadow-md transition"
+                    className="border rounded-lg p-4 hover:shadow-md transition"
                   >
                     <div className="flex justify-between">
                       <h3 className="font-medium text-lg">{job.title}</h3>
-                      <span className="text-sm text-gray-300 dark:text-muted-foreground">
+                      <span className="text-sm text-gray-500">
                         {formatDate(job.date)}
                       </span>
                     </div>
-                    <p className="text-gray-700 dark:text-muted-foreground font-medium">{job.company}</p>
-
+                    <p className="text-gray-700 font-medium">{job.company}</p>
                     <div className="flex flex-wrap gap-2 my-2">
-                      <div className="flex items-center text-sm text-gray-600 dark:text-muted-foreground">
+                      <div className="flex items-center text-sm text-gray-600">
                         <FaBriefcase className="mr-1" />
                         {job.job_type}
                       </div>
-                      <div className="flex items-center text-sm text-gray-600 dark:text-muted-foreground">
+                      <div className="flex items-center text-sm text-gray-600">
                         <FaMapMarkerAlt className="mr-1" />
                         {job.location}
                       </div>
-                      <div className="flex items-center text-sm text-gray-600 dark:text-muted-foreground">
+                      <div className="flex items-center text-sm text-gray-600">
                         <FaDollarSign className="mr-1" />
                         {formatSalary(job.salary)}
                       </div>
                     </div>
-
-                    <p className="text-sm text-gray-600 dark:text-muted-foreground line-clamp-2 mt-1">
+                    <p className="text-sm text-gray-600 line-clamp-2 mt-1">
                       {job.description}
                     </p>
-
                     <div className="mt-3 flex flex-wrap gap-1">
                       {job.skills.slice(0, 3).map((skill, index) => (
                         <span
                           key={index}
-                          className="bg-gray-100 dark:bg-muted text-gray-800 dark:text-gray-300 text-xs px-2 py-1 rounded"
+                          className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded"
                         >
                           {skill}
                         </span>
                       ))}
                       {job.skills.length > 3 && (
-                        <span className="bg-gray-100 dark:bg-muted text-gray-800 dark:text-gray-300 text-xs px-2 py-1 rounded">
+                        <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
                           +{job.skills.length - 3} more
                         </span>
                       )}
                     </div>
-
                     <div className="mt-3 flex justify-between items-center">
                       {job.verified ? (
                         <span className="text-xs text-green-600 flex items-center">
                           ✓ Verified listing
                         </span>
                       ) : (
-                        <span className="text-xs text-gray-300 dark:text-muted-foreground flex items-center">
+                        <span className="text-xs text-gray-500 flex items-center">
                           Pending verification
                         </span>
                       )}
@@ -295,7 +474,7 @@ return (
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-lg text-gray-600 dark:text-muted-foreground">
+                <p className="text-lg text-gray-600">
                   No jobs found{search ? " matching your search" : ""}.
                 </p>
                 {search && (
@@ -308,10 +487,12 @@ return (
                 )}
               </div>
             )}
-
             {filteredJobs.length > 0 && (
               <div className="mt-6 text-center">
-                <Link href="/jobs/browse" className="text-blue-600 hover:underline">
+                <Link
+                  href="/jobs/browse"
+                  className="text-blue-600 hover:underline"
+                >
                   View All Job Listings
                 </Link>
               </div>
