@@ -14,13 +14,13 @@ import {
   setDoc,
   arrayUnion,
   arrayRemove,
-  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '@/app/firebase';
 import { useAuth } from '@/app/auth-context';
 import { formatDistanceToNow } from 'date-fns';
 import NewMessagePopup from './new-message-popup';
 import MessageThread from './message-thread';
+import { MessageSquare } from 'lucide-react';
 
 interface Chat {
   id: string;
@@ -42,6 +42,8 @@ export default function ChatPopup() {
   const [deletedChats, setDeletedChats] = useState<string[]>([]);
   const [menuOpenChatId, setMenuOpenChatId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null); // 🆕 confirmation modal
+
   const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -128,18 +130,6 @@ export default function ChatPopup() {
     showTemporaryMessage('Chat archived');
   };
 
-  const deleteChat = async (chatId: string) => {
-    const confirmed = window.confirm('Are you sure you want to delete this chat?');
-    if (!confirmed) return;
-    const settingsRef = doc(db, 'users', user!.uid, 'chatSettings', 'hiddenChats');
-    await updateDoc(settingsRef, {
-      deleted: arrayUnion(chatId),
-    });
-    setDeletedChats((prev) => [...prev, chatId]);
-    setMenuOpenChatId(null);
-    showTemporaryMessage('Chat deleted');
-  };
-
   const unarchiveChat = async (chatId: string) => {
     const settingsRef = doc(db, 'users', user!.uid, 'chatSettings', 'hiddenChats');
     await updateDoc(settingsRef, {
@@ -150,6 +140,10 @@ export default function ChatPopup() {
     showTemporaryMessage('Moved to Messages');
   };
 
+  const deleteChat = async (chatId: string) => {
+    setConfirmDeleteId(chatId);
+  };
+
   const hasUnread = (chat: Chat) => {
     return chat.unreadBy?.includes(user?.email ?? '') ?? false;
   };
@@ -157,7 +151,7 @@ export default function ChatPopup() {
   const renderProfileIcon = (email: string) => {
     const icon = profileIcons[email];
     return (
-      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white text-xl font-semibold overflow-hidden">
+      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-black text-xl font-semibold overflow-hidden">
         {icon || email.charAt(0).toUpperCase()}
       </div>
     );
@@ -169,15 +163,20 @@ export default function ChatPopup() {
     return !archivedChats.includes(chat.id);
   });
 
+  const hasAnyUnread = chats.some((chat) => hasUnread(chat));
+
   return (
     <>
-      {/* minimized */}
+      {/* Floating button */}
       {isMinimized ? (
         <button
           onClick={() => setIsMinimized(false)}
-          className="fixed bottom-6 right-6 z-[9999] bg-green-600 hover:bg-green-700 text-white p-4 rounded-full shadow-lg"
+          className="fixed bottom-6 right-6 z-[9999] bg-green-600 hover:bg-green-700 text-white p-4 rounded-full shadow-lg flex items-center justify-center"
         >
-          💬
+          <MessageSquare className="w-6 h-6" />
+          {hasAnyUnread && (
+            <span className="absolute top-1.5 right-1.5 w-3 h-3 bg-red-500 rounded-full shadow-sm" />
+          )}
         </button>
       ) : (
         <div className="fixed bottom-6 right-6 w-[320px] bg-white border shadow-xl rounded-lg z-[9999] p-4">
@@ -299,7 +298,7 @@ export default function ChatPopup() {
         </div>
       )}
 
-      {/* New Message Popup */}
+      {/* New Message */}
       {showNewPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-40 z-[9999] flex justify-center items-center">
           <div className="bg-white rounded-lg p-4 w-[350px] shadow-lg">
@@ -330,9 +329,44 @@ export default function ChatPopup() {
         </div>
       )}
 
+      {/* Status Message */}
       {statusMessage && (
         <div className="fixed bottom-4 right-6 bg-black text-white px-4 py-2 rounded shadow-md text-sm z-[9999] opacity-90 transition-opacity duration-300">
           {statusMessage}
+        </div>
+      )}
+
+      {/* 🆕 Delete Confirmation Modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-center z-[9999]">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-[300px]">
+            <h3 className="text-lg font-semibold mb-3">Delete Chat</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to delete this chat?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-4 py-2 text-sm text-gray-700 hover:text-black"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const settingsRef = doc(db, 'users', user!.uid, 'chatSettings', 'hiddenChats');
+                  await updateDoc(settingsRef, {
+                    deleted: arrayUnion(confirmDeleteId),
+                  });
+                  setDeletedChats((prev) => [...prev, confirmDeleteId]);
+                  setConfirmDeleteId(null);
+                  showTemporaryMessage('Chat deleted');
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>
