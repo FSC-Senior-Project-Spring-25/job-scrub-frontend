@@ -130,7 +130,7 @@ export default function MessageThread({ chatId }: { chatId: string }) {
           {otherUserProfileIcon ? (
             <span className="text-2xl">{otherUserProfileIcon}</span>
           ) : (
-            <span className="text-white text-xl font-semibold">
+            <span className="text-black text-xl font-semibold">
               {otherUserEmail?.charAt(0).toUpperCase() ?? '?'}
             </span>
           )}
