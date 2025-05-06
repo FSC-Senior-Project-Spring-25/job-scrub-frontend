@@ -117,3 +117,15 @@ body {
   }
 
 }
+
+@layer utilities {
+  /* Invisible scrollbar utility class */
+  .invisible-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  .invisible-scrollbar::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
+  }
+}
