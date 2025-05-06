@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from "react";
 import {
   collection,
   query,
@@ -14,13 +14,29 @@ import {
   setDoc,
   arrayUnion,
   arrayRemove,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useAuth } from '@/app/auth-context';
-import { formatDistanceToNow } from 'date-fns';
-import NewMessagePopup from './new-message-popup';
-import MessageThread from './message-thread';
-import { MessageSquare } from 'lucide-react';
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/app/auth-context";
+import { formatDistanceToNow } from "date-fns";
+import NewMessagePopup from "./new-message-popup";
+import MessageThread from "./message-thread";
+import { MessageSquare } from "lucide-react";
+import Image from "next/image";
+
+function isImageUrl(str: string): boolean {
+  if (!str) return false;
+
+  const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp"];
+  const isUrl = str.startsWith("http://") || str.startsWith("https://");
+
+  if (!isUrl) return false;
+
+  return (
+    imageExtensions.some((ext) => str.toLowerCase().endsWith(ext)) ||
+    str.includes("googleusercontent.com") ||
+    str.includes("firebasestorage.googleapis.com")
+  );
+}
 
 interface Chat {
   id: string;
@@ -50,9 +66,9 @@ export default function ChatPopup() {
     if (!user?.uid || !user?.email) return;
 
     const chatQuery = query(
-      collection(db, 'chats'),
-      where('users', 'array-contains', user.email),
-      orderBy('updatedAt', 'desc')
+      collection(db, "chats"),
+      where("users", "array-contains", user.email),
+      orderBy("updatedAt", "desc")
     );
 
     const unsub = onSnapshot(chatQuery, async (snapshot) => {
@@ -63,18 +79,21 @@ export default function ChatPopup() {
         const chat: Chat = {
           id: docSnap.id,
           users: data.users || [],
-          lastMessage: data.lastMessage || '',
+          lastMessage: data.lastMessage || "",
           updatedAt: data.updatedAt || null,
           unreadBy: data.unreadBy || [],
         };
 
         const otherUserEmail = chat.users.find((u) => u !== user.email);
         if (otherUserEmail && !profileIcons[otherUserEmail]) {
-          const q = query(collection(db, 'users'), where('email', '==', otherUserEmail));
+          const q = query(
+            collection(db, "users"),
+            where("email", "==", otherUserEmail)
+          );
           const snapshot = await getDocs(q);
           if (!snapshot.empty) {
             const data = snapshot.docs[0].data();
-            profileIcons[otherUserEmail] = data.profileIcon || '';
+            profileIcons[otherUserEmail] = data.profileIcon || "";
           }
         }
 
@@ -99,12 +118,18 @@ export default function ChatPopup() {
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const loadHiddenChats = async () => {
-    const settingsRef = doc(db, 'users', user!.uid, 'chatSettings', 'hiddenChats');
+    const settingsRef = doc(
+      db,
+      "users",
+      user!.uid,
+      "chatSettings",
+      "hiddenChats"
+    );
     const snap = await getDoc(settingsRef);
     if (snap.exists()) {
       const data = snap.data();
@@ -121,23 +146,35 @@ export default function ChatPopup() {
   };
 
   const archiveChat = async (chatId: string) => {
-    const settingsRef = doc(db, 'users', user!.uid, 'chatSettings', 'hiddenChats');
+    const settingsRef = doc(
+      db,
+      "users",
+      user!.uid,
+      "chatSettings",
+      "hiddenChats"
+    );
     await updateDoc(settingsRef, {
       archived: arrayUnion(chatId),
     });
     setArchivedChats((prev) => [...prev, chatId]);
     setMenuOpenChatId(null);
-    showTemporaryMessage('Chat archived');
+    showTemporaryMessage("Chat archived");
   };
 
   const unarchiveChat = async (chatId: string) => {
-    const settingsRef = doc(db, 'users', user!.uid, 'chatSettings', 'hiddenChats');
+    const settingsRef = doc(
+      db,
+      "users",
+      user!.uid,
+      "chatSettings",
+      "hiddenChats"
+    );
     await updateDoc(settingsRef, {
       archived: arrayRemove(chatId),
     });
     setArchivedChats((prev) => prev.filter((id) => id !== chatId));
     setMenuOpenChatId(null);
-    showTemporaryMessage('Moved to Messages');
+    showTemporaryMessage("Moved to Messages");
   };
 
   const deleteChat = async (chatId: string) => {
@@ -145,14 +182,32 @@ export default function ChatPopup() {
   };
 
   const hasUnread = (chat: Chat) => {
-    return chat.unreadBy?.includes(user?.email ?? '') ?? false;
+    return chat.unreadBy?.includes(user?.email ?? "") ?? false;
   };
 
   const renderProfileIcon = (email: string) => {
     const icon = profileIcons[email];
+
     return (
       <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-black text-xl font-semibold overflow-hidden">
-        {icon || email.charAt(0).toUpperCase()}
+        {icon ? (
+          isImageUrl(icon) ? (
+            // If icon is an image URL, render it as an image
+            <Image
+              src={icon}
+              alt={email.substring(0, email.indexOf("@"))}
+              className="w-full h-full object-cover"
+              width={40}
+              height={40}
+            />
+          ) : (
+            // If icon is not a URL (like an emoji), render as text
+            icon
+          )
+        ) : (
+          // Default to first letter of email
+          email.charAt(0).toUpperCase()
+        )}
       </div>
     );
   };
@@ -203,38 +258,46 @@ export default function ChatPopup() {
               onClick={() => setShowArchived(!showArchived)}
               className="text-xs text-green-700 hover:underline"
             >
-              {showArchived ? 'Back to Messages' : 'Show Archived'}
+              {showArchived ? "Back to Messages" : "Show Archived"}
             </button>
           </div>
 
           <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto">
             {visibleChats.length > 0 ? (
               visibleChats.map((chat) => {
-                const otherUser = chat.users.find((u) => u !== user?.email) || '?';
+                const otherUser =
+                  chat.users.find((u) => u !== user?.email) || "?";
                 const time = chat.updatedAt?.toDate
-                  ? formatDistanceToNow(chat.updatedAt.toDate(), { addSuffix: true })
-                  : '';
+                  ? formatDistanceToNow(chat.updatedAt.toDate(), {
+                      addSuffix: true,
+                    })
+                  : "";
 
                 return (
                   <div
                     key={chat.id}
                     className="flex items-center gap-3 p-2 rounded hover:bg-gray-100 transition relative"
                   >
-                    <div onClick={() => setOpenChatId(chat.id)} className="cursor-pointer">
+                    <div
+                      onClick={() => setOpenChatId(chat.id)}
+                      className="cursor-pointer"
+                    >
                       {renderProfileIcon(otherUser)}
                     </div>
                     <div
                       onClick={async () => {
                         setOpenChatId(chat.id);
-                        const chatRef = doc(db, 'chats', chat.id);
+                        const chatRef = doc(db, "chats", chat.id);
                         await updateDoc(chatRef, {
-                          unreadBy: arrayRemove(user?.email ?? ''),
+                          unreadBy: arrayRemove(user?.email ?? ""),
                         });
                       }}
                       className="flex-1 min-w-0 cursor-pointer"
                     >
                       <div className="font-semibold truncate">{otherUser}</div>
-                      <div className="text-xs text-gray-500 truncate">{chat.lastMessage}</div>
+                      <div className="text-xs text-gray-500 truncate">
+                        {chat.lastMessage}
+                      </div>
                       <div className="text-xs text-gray-400">{time}</div>
                     </div>
 
@@ -242,9 +305,18 @@ export default function ChatPopup() {
                       <span className="w-2 h-2 bg-red-500 rounded-full mr-1" />
                     )}
 
-                    <div className="relative" ref={(el) => { menuRefs.current[chat.id] = el; }}>
+                    <div
+                      className="relative"
+                      ref={(el) => {
+                        menuRefs.current[chat.id] = el;
+                      }}
+                    >
                       <button
-                        onClick={() => setMenuOpenChatId((prev) => (prev === chat.id ? null : chat.id))}
+                        onClick={() =>
+                          setMenuOpenChatId((prev) =>
+                            prev === chat.id ? null : chat.id
+                          )
+                        }
                         className="text-gray-400 hover:text-black"
                       >
                         ⋮
@@ -291,7 +363,7 @@ export default function ChatPopup() {
               })
             ) : (
               <div className="text-center text-gray-400 mt-6">
-                {showArchived ? 'No archived chats.' : 'No messages yet.'}
+                {showArchived ? "No archived chats." : "No messages yet."}
               </div>
             )}
           </div>
@@ -302,7 +374,12 @@ export default function ChatPopup() {
       {showNewPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-40 z-[9999] flex justify-center items-center">
           <div className="bg-white rounded-lg p-4 w-[350px] shadow-lg">
-            <button onClick={() => setShowNewPopup(false)} className="text-gray-400 float-right">✕</button>
+            <button
+              onClick={() => setShowNewPopup(false)}
+              className="text-gray-400 float-right"
+            >
+              ✕
+            </button>
             <NewMessagePopup
               onCloseAction={() => setShowNewPopup(false)}
               onOpenChatAction={(chatId) => {
@@ -319,7 +396,10 @@ export default function ChatPopup() {
         <div className="fixed bottom-6 right-[350px] w-[320px] h-[480px] bg-white border shadow-xl rounded-lg z-[9999] flex flex-col">
           <div className="bg-green-100 p-3 flex justify-between items-center rounded-t">
             <span className="font-semibold">Chat</span>
-            <button onClick={() => setOpenChatId(null)} className="text-gray-600 hover:text-red-600">
+            <button
+              onClick={() => setOpenChatId(null)}
+              className="text-gray-600 hover:text-red-600"
+            >
               ✕
             </button>
           </div>
@@ -353,13 +433,19 @@ export default function ChatPopup() {
               </button>
               <button
                 onClick={async () => {
-                  const settingsRef = doc(db, 'users', user!.uid, 'chatSettings', 'hiddenChats');
+                  const settingsRef = doc(
+                    db,
+                    "users",
+                    user!.uid,
+                    "chatSettings",
+                    "hiddenChats"
+                  );
                   await updateDoc(settingsRef, {
                     deleted: arrayUnion(confirmDeleteId),
                   });
                   setDeletedChats((prev) => [...prev, confirmDeleteId]);
                   setConfirmDeleteId(null);
-                  showTemporaryMessage('Chat deleted');
+                  showTemporaryMessage("Chat deleted");
                 }}
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
               >

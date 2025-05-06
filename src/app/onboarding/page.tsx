@@ -1,37 +1,70 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { db } from "../../lib/firebase"
-import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from "firebase/firestore"
-import { toast } from "sonner"
-import { useAuth } from "../auth-context"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import type * as z from "zod"
-import { Check, ChevronLeft, ChevronRight, FileText, Plus, Briefcase, GraduationCap, User, Trash2 } from "lucide-react"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { db, auth } from "../../lib/firebase";
+import {
+  doc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
+  getDoc,
+} from "firebase/firestore";
+import { toast } from "sonner";
+import { useAuth } from "../auth-context";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import type * as z from "zod";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Plus,
+  Briefcase,
+  GraduationCap,
+  User,
+  Trash2,
+} from "lucide-react";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
-import { Progress } from "@/components/ui/progress"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
-import AnimatedLogo from "@/components/animated-logo"
-import { FormStep } from "@/components/onboarding/form-step"
-import { ListItem } from "@/components/onboarding/list-item"
-import FileUpload from "@/components/file-upload"
-import { personalInfoSchema, educationSchema, experienceSchema } from "@/lib/schemas"
-import { updateProfile } from "firebase/auth"
-import { User as FirebaseUser } from "firebase/auth"
+import AnimatedLogo from "@/components/animated-logo";
+import { FormStep } from "@/components/onboarding/form-step";
+import { ListItem } from "@/components/onboarding/list-item";
+import FileUpload from "@/components/file-upload";
+import {
+  personalInfoSchema,
+  educationSchema,
+  experienceSchema,
+} from "@/lib/schemas";
 
 export default function Onboarding() {
-  const router = useRouter()
-  const { user } = useAuth() as { user: FirebaseUser | null };
-  const [loading, setLoading] = useState(true)
-  const [currentStep, setCurrentStep] = useState(1)
+  const router = useRouter();
+  const { user, refreshToken } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [currentStep, setCurrentStep] = useState(1);
   const [userData, setUserData] = useState({
     username: "",
     email: "",
@@ -42,21 +75,21 @@ export default function Onboarding() {
     education: [] as string[],
     experience: [] as string[],
     resume_id: null as string | null,
-  })
+  });
 
   // Resume upload state
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [resumeFileName, setResumeFileName] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [resumeFileName, setResumeFileName] = useState<string | null>(null);
 
   // Education state
-  const [newEducation, setNewEducation] = useState("")
-  const [isAddingEducation, setIsAddingEducation] = useState(false)
+  const [newEducation, setNewEducation] = useState("");
+  const [isAddingEducation, setIsAddingEducation] = useState(false);
 
   // Experience state
-  const [newExperience, setNewExperience] = useState("")
-  const [isAddingExperience, setIsAddingExperience] = useState(false)
+  const [newExperience, setNewExperience] = useState("");
+  const [isAddingExperience, setIsAddingExperience] = useState(false);
 
   // Form validation
   const personalInfoForm = useForm<z.infer<typeof personalInfoSchema>>({
@@ -67,57 +100,77 @@ export default function Onboarding() {
       bio: "",
       isPrivate: false,
     },
-  })
+  });
 
   const educationForm = useForm<z.infer<typeof educationSchema>>({
     resolver: zodResolver(educationSchema),
     defaultValues: {
       education: "",
     },
-  })
+  });
 
   const experienceForm = useForm<z.infer<typeof experienceSchema>>({
     resolver: zodResolver(experienceSchema),
     defaultValues: {
       experience: "",
     },
-  })
+  });
 
   // Fetch resume preview URL
   const fetchResumePreview = async (resumeId: string) => {
-    if (!user) return
+    if (!user) return;
 
     try {
-      const token = await user.getIdToken()
-      const response = await fetch(`/api/resume/view?key=${encodeURIComponent(resumeId)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const token = await user.getIdToken();
+      const response = await fetch(
+        `/api/resume/view?key=${encodeURIComponent(resumeId)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-      if (!response.ok) throw new Error("Failed to fetch resume preview")
+      if (!response.ok) throw new Error("Failed to fetch resume preview");
 
-      const data = await response.json()
+      const data = await response.json();
       if (data && data.url) {
-        setPreviewUrl(data.url)
+        setPreviewUrl(data.url);
       }
     } catch (error) {
-      console.error("Error fetching resume preview:", error)
-      toast.error("Failed to load resume preview")
+      console.error("Error fetching resume preview:", error);
+      toast.error("Failed to load resume preview");
     }
-  }
+  };
 
   useEffect(() => {
     const fetchUserData = async () => {
       if (!user) {
-        router.push("/login")
-        return
+        router.push("/login");
+        return;
       }
 
       try {
-        const userRef = doc(db, "users", user.uid)
-        const userSnap = await getDoc(userRef)
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
-          const data = userSnap.data()
+          const data = userSnap.data();
+
+          // For Google users, if username is empty but displayName exists, use displayName
+          if (!data.username && user.displayName) {
+            await updateDoc(userRef, {
+              username: user.displayName,
+            });
+            data.username = user.displayName;
+          }
+
+          // For Google users, if no profileIcon but photoURL exists, use photoURL
+          if (!data.profileIcon && user.photoURL) {
+            await updateDoc(userRef, {
+              profileIcon: user.photoURL,
+            });
+            data.profileIcon = user.photoURL;
+          }
+
           const updatedUserData = {
             username: data.username || "",
             email: data.email || user.email || "",
@@ -128,14 +181,14 @@ export default function Onboarding() {
             education: data.education || [],
             experience: data.experience || [],
             resume_id: data.resume_id || null,
-          }
+          };
 
-          setUserData(updatedUserData)
-          setResumeFileName(data.resume_filename || null)
+          setUserData(updatedUserData);
+          setResumeFileName(data.resume_filename || null);
 
           // If there's a resume ID, fetch the preview URL
           if (data.resume_id) {
-            await fetchResumePreview(data.resume_id)
+            await fetchResumePreview(data.resume_id);
           }
 
           // Update form default values
@@ -144,275 +197,284 @@ export default function Onboarding() {
             phone: updatedUserData.phone,
             bio: updatedUserData.bio,
             isPrivate: updatedUserData.isPrivate,
-          })
+          });
         }
       } catch (error) {
-        console.error("Error fetching user data:", error)
-        toast.error("Failed to load your profile data")
+        console.error("Error fetching user data:", error);
+        toast.error("Failed to load your profile data");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchUserData()
-  }, [user, router, personalInfoForm])
+    fetchUserData();
+  }, [user?.uid, router, personalInfoForm]);
 
   // Handle resume upload
   const handleUpload = async () => {
-    if (!selectedFile || !user) return
+    if (!selectedFile || !user) return;
 
-    setUploading(true)
+    setUploading(true);
     try {
-      const formData = new FormData()
-      formData.append("file", selectedFile)
-      formData.append("user_id", user.uid)
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("user_id", user.uid);
 
-      const token = await user.getIdToken()
+      const token = await user.getIdToken();
       const response = await fetch("/api/resume/upload", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
-      })
+      });
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Upload failed")
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Upload failed");
       }
 
-      const data = await response.json()
-      console.log("Upload response:", data) // Debug log
+      const data = await response.json();
+      console.log("Upload response:", data); // Debug log
 
       // Update Firestore with the resume ID and filename
-      const userRef = doc(db, "users", user.uid)
+      const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         resume_id: data.file_id,
         resume_filename: data.filename || selectedFile.name,
-      })
+      });
 
       // Update local state
       setUserData((prev) => ({
         ...prev,
         resume_id: data.file_id,
-      }))
-      setResumeFileName(data.filename || selectedFile.name)
+      }));
+      setResumeFileName(data.filename || selectedFile.name);
 
-      toast.success("Resume uploaded successfully")
+      toast.success("Resume uploaded successfully");
 
       // Fetch the preview URL for the newly uploaded resume
-      await fetchResumePreview(data.file_id)
+      await fetchResumePreview(data.file_id);
     } catch (error) {
-      console.error("Upload error:", error)
-      toast.error("Failed to upload resume")
+      console.error("Upload error:", error);
+      toast.error("Failed to upload resume");
     } finally {
-      setUploading(false)
-      setSelectedFile(null)
+      setUploading(false);
+      setSelectedFile(null);
     }
-  }
+  };
 
   // Handle delete resume
   const handleDeleteResume = async () => {
-    if (!userData.resume_id || !user) return
+    if (!userData.resume_id || !user) return;
 
     try {
-      const token = await user.getIdToken()
-      const response = await fetch(`/api/resume/delete?key=${encodeURIComponent(userData.resume_id)}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const token = await user.getIdToken();
+      const response = await fetch(
+        `/api/resume/delete?key=${encodeURIComponent(userData.resume_id)}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-      if (!response.ok) throw new Error("Delete failed")
+      if (!response.ok) throw new Error("Delete failed");
 
       // Update Firestore to remove the resume ID and filename
-      const userRef = doc(db, "users", user.uid)
+      const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         resume_id: null,
         resume_filename: null,
-      })
+      });
 
       // Reset state
-      setPreviewUrl(null)
-      setResumeFileName(null)
+      setPreviewUrl(null);
+      setResumeFileName(null);
       setUserData((prev) => ({
         ...prev,
         resume_id: null,
-      }))
+      }));
 
-      toast.success("Resume deleted successfully")
+      toast.success("Resume deleted successfully");
     } catch (error) {
-      console.error("Delete error:", error)
-      toast.error("Failed to delete resume")
+      console.error("Delete error:", error);
+      toast.error("Failed to delete resume");
     }
-  }
+  };
 
   // Handle add education
-  const handleAddEducation = async (values: z.infer<typeof educationSchema>) => {
-    if (!user) return
+  const handleAddEducation = async (
+    values: z.infer<typeof educationSchema>
+  ) => {
+    if (!user) return;
 
     try {
-      const userRef = doc(db, "users", user.uid)
+      const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         education: arrayUnion(values.education),
-      })
+      });
 
       setUserData((prev) => ({
         ...prev,
         education: [...prev.education, values.education],
-      }))
+      }));
 
-      educationForm.reset()
-      setIsAddingEducation(false)
-      toast.success("Education added successfully")
+      educationForm.reset();
+      setIsAddingEducation(false);
+      toast.success("Education added successfully");
     } catch (error) {
-      console.error("Error adding education:", error)
-      toast.error("Failed to add education")
+      console.error("Error adding education:", error);
+      toast.error("Failed to add education");
     }
-  }
+  };
 
   // Handle delete education
   const handleDeleteEducation = async (item: string) => {
-    if (!user) return
+    if (!user) return;
 
     try {
-      const userRef = doc(db, "users", user.uid)
+      const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         education: arrayRemove(item),
-      })
+      });
 
       setUserData((prev) => ({
         ...prev,
         education: prev.education.filter((edu) => edu !== item),
-      }))
+      }));
 
-      toast.success("Education removed successfully")
+      toast.success("Education removed successfully");
     } catch (error) {
-      console.error("Error removing education:", error)
-      toast.error("Failed to remove education")
+      console.error("Error removing education:", error);
+      toast.error("Failed to remove education");
     }
-  }
+  };
 
   // Handle add experience
-  const handleAddExperience = async (values: z.infer<typeof experienceSchema>) => {
-    if (!user) return
+  const handleAddExperience = async (
+    values: z.infer<typeof experienceSchema>
+  ) => {
+    if (!user) return;
 
     try {
-      const userRef = doc(db, "users", user.uid)
+      const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         experience: arrayUnion(values.experience),
-      })
+      });
 
       setUserData((prev) => ({
         ...prev,
         experience: [...prev.experience, values.experience],
-      }))
+      }));
 
-      experienceForm.reset()
-      setIsAddingExperience(false)
-      toast.success("Experience added successfully")
+      experienceForm.reset();
+      setIsAddingExperience(false);
+      toast.success("Experience added successfully");
     } catch (error) {
-      console.error("Error adding experience:", error)
-      toast.error("Failed to add experience")
+      console.error("Error adding experience:", error);
+      toast.error("Failed to add experience");
     }
-  }
+  };
 
   // Handle delete experience
   const handleDeleteExperience = async (item: string) => {
-    if (!user) return
+    if (!user) return;
 
     try {
-      const userRef = doc(db, "users", user.uid)
+      const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         experience: arrayRemove(item),
-      })
+      });
 
       setUserData((prev) => ({
         ...prev,
         experience: prev.experience.filter((exp) => exp !== item),
-      }))
+      }));
 
-      toast.success("Experience removed successfully")
+      toast.success("Experience removed successfully");
     } catch (error) {
-      console.error("Error removing experience:", error)
-      toast.error("Failed to remove experience")
+      console.error("Error removing experience:", error);
+      toast.error("Failed to remove experience");
     }
-  }
+  };
 
   // Handle bio and personal info updates
-  const handleUpdateProfile = async (values: z.infer<typeof personalInfoSchema>) => {
-    if (!user) return
+  const handleUpdateProfile = async (
+    values: z.infer<typeof personalInfoSchema>
+  ) => {
+    if (!user) return;
 
     try {
-      const userRef = doc(db, "users", user.uid)
+      // Update the user's profile in Firestore
+      const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         username: values.username,
         bio: values.bio || "",
         phone: values.phone || "",
         isPrivate: values.isPrivate,
-      })
+      });
 
-      if (user) {
-        await updateProfile(user, {
-          displayName: values.username
-        });
-      }
-
+      // Update local state
       setUserData((prev) => ({
         ...prev,
         username: values.username,
         bio: values.bio || "",
         phone: values.phone || "",
         isPrivate: values.isPrivate,
-      }))
+      }));
 
-      toast.success("Profile updated successfully")
-      return true
+      // Update the session with the new profile data
+      // This is safer than directly using Firebase's updateProfile
+      await refreshToken();
+
+      toast.success("Profile updated successfully");
+      return true;
     } catch (error) {
-      console.error("Error updating profile:", error)
-      toast.error("Failed to update profile")
-      return false
+      console.error("Error updating profile:", error);
+      toast.error("Failed to update profile");
+      return false;
     }
-  }
+  };
 
   const handleFinish = async () => {
-    const isValid = await personalInfoForm.trigger()
+    const isValid = await personalInfoForm.trigger();
     if (!isValid) {
-      toast.error("Please complete all required fields")
-      setCurrentStep(1)
-      return
+      toast.error("Please complete all required fields");
+      setCurrentStep(1);
+      return;
     }
 
-    const values = personalInfoForm.getValues()
-    const success = await handleUpdateProfile(values)
+    const values = personalInfoForm.getValues();
+    const success = await handleUpdateProfile(values);
     if (success) {
-      router.push("/")
+      router.push("/");
     }
-  }
+  };
 
   const nextStep = async () => {
     if (currentStep === 1) {
-      const isValid = await personalInfoForm.trigger()
-      if (!isValid) return
+      const isValid = await personalInfoForm.trigger();
+      if (!isValid) return;
 
-      const values = personalInfoForm.getValues()
-      await handleUpdateProfile(values)
+      const values = personalInfoForm.getValues();
+      await handleUpdateProfile(values);
     }
 
     if (currentStep < 4) {
-      setCurrentStep(currentStep + 1)
+      setCurrentStep(currentStep + 1);
     }
-  }
+  };
 
   const prevStep = () => {
     if (currentStep > 1) {
-      setCurrentStep(currentStep - 1)
+      setCurrentStep(currentStep - 1);
     }
-  }
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <AnimatedLogo />
       </div>
-    )
+    );
   }
 
   return (
@@ -420,8 +482,12 @@ export default function Onboarding() {
       <div className="max-w-3xl mx-auto">
         <Card className="border-none shadow-lg">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl md:text-2xl font-bold text-center">Complete Your Profile</CardTitle>
-            <CardDescription className="text-center">Let's set up your profile to help you get started</CardDescription>
+            <CardTitle className="text-xl md:text-2xl font-bold text-center">
+              Complete Your Profile
+            </CardTitle>
+            <CardDescription className="text-center">
+              Let's set up your profile to help you get started
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {/* Progress indicator */}
@@ -431,14 +497,23 @@ export default function Onboarding() {
                   <div
                     key={step}
                     className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center border-2 transition-colors ${
-                      currentStep >= step ? "bg-green-600 border-green-600 text-white" : "border-gray-300 text-gray-400"
+                      currentStep >= step
+                        ? "bg-green-600 border-green-600 text-white"
+                        : "border-gray-300 text-gray-400"
                     }`}
                   >
-                    {currentStep > step ? <Check className="h-4 w-4 md:h-5 md:w-5" /> : step}
+                    {currentStep > step ? (
+                      <Check className="h-4 w-4 md:h-5 md:w-5" />
+                    ) : (
+                      step
+                    )}
                   </div>
                 ))}
               </div>
-              <Progress value={(currentStep - 1) * 33.33} className="h-2 mb-2 [&>div]:bg-green-600" />
+              <Progress
+                value={(currentStep - 1) * 33.33}
+                className="h-2 mb-2 [&>div]:bg-green-600"
+              />
               <div className="flex justify-between text-xs text-gray-500">
                 <span>Personal Info</span>
                 <span>Resume</span>
@@ -448,7 +523,11 @@ export default function Onboarding() {
             </div>
 
             {/* Step 1: Personal Information */}
-            <FormStep title="Personal Information" icon={<User className="h-5 w-5" />} isActive={currentStep === 1}>
+            <FormStep
+              title="Personal Information"
+              icon={<User className="h-5 w-5" />}
+              isActive={currentStep === 1}
+            >
               <Form {...personalInfoForm}>
                 <form className="space-y-4">
                   <FormField
@@ -458,7 +537,10 @@ export default function Onboarding() {
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter your full name" {...field} />
+                          <Input
+                            placeholder="Enter your full name"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -472,7 +554,10 @@ export default function Onboarding() {
                       <FormItem>
                         <FormLabel>Phone Number</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter your phone number" {...field} />
+                          <Input
+                            placeholder="Enter your phone number"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -486,7 +571,12 @@ export default function Onboarding() {
                       <FormItem>
                         <FormLabel>Bio</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="Tell us about yourself" className="resize-none" rows={4} {...field} />
+                          <Textarea
+                            placeholder="Tell us about yourself"
+                            className="resize-none"
+                            rows={4}
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -500,10 +590,15 @@ export default function Onboarding() {
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                         <div className="space-y-0.5">
                           <FormLabel>Private Profile</FormLabel>
-                          <FormDescription>Make your profile private to other users</FormDescription>
+                          <FormDescription>
+                            Make your profile private to other users
+                          </FormDescription>
                         </div>
                         <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
                         </FormControl>
                       </FormItem>
                     )}
@@ -538,11 +633,19 @@ export default function Onboarding() {
 
                       <div className="flex flex-col items-center justify-center rounded-md bg-muted p-6">
                         <FileText className="mb-3 h-16 w-16 text-green-600" />
-                        <p className="text-center font-medium mb-1">{resumeFileName || "Resume"}</p>
-                        <p className="text-sm text-muted-foreground mb-4 text-center">
-                          Click the button below to view your resume in a new window
+                        <p className="text-center font-medium mb-1">
+                          {resumeFileName || "Resume"}
                         </p>
-                        <Button variant="default" size="lg" className="bg-green-600 hover:bg-green-700" asChild>
+                        <p className="text-sm text-muted-foreground mb-4 text-center">
+                          Click the button below to view your resume in a new
+                          window
+                        </p>
+                        <Button
+                          variant="default"
+                          size="lg"
+                          className="bg-green-600 hover:bg-green-700"
+                          asChild
+                        >
                           <a
                             href={previewUrl}
                             target="_blank"
@@ -579,13 +682,18 @@ export default function Onboarding() {
                 )}
 
                 <p className="text-sm text-muted-foreground">
-                  Please upload your resume in PDF format only. Maximum file size: 5MB.
+                  Please upload your resume in PDF format only. Maximum file
+                  size: 5MB.
                 </p>
               </div>
             </FormStep>
 
             {/* Step 3: Education */}
-            <FormStep title="Your Education" icon={<GraduationCap className="h-5 w-5" />} isActive={currentStep === 3}>
+            <FormStep
+              title="Your Education"
+              icon={<GraduationCap className="h-5 w-5" />}
+              isActive={currentStep === 3}
+            >
               <div className="space-y-4">
                 {userData.education.length > 0 ? (
                   <div className="space-y-3">
@@ -601,14 +709,19 @@ export default function Onboarding() {
                 ) : (
                   <Card className="bg-gray-50 border border-gray-200">
                     <CardContent className="p-6 text-center">
-                      <p className="text-muted-foreground">No education entries added yet.</p>
+                      <p className="text-muted-foreground">
+                        No education entries added yet.
+                      </p>
                     </CardContent>
                   </Card>
                 )}
 
                 {isAddingEducation ? (
                   <Form {...educationForm}>
-                    <form onSubmit={educationForm.handleSubmit(handleAddEducation)} className="space-y-4">
+                    <form
+                      onSubmit={educationForm.handleSubmit(handleAddEducation)}
+                      className="space-y-4"
+                    >
                       <FormField
                         control={educationForm.control}
                         name="education"
@@ -629,15 +742,18 @@ export default function Onboarding() {
                       />
 
                       <div className="flex flex-col sm:flex-row gap-2">
-                        <Button type="submit" className="bg-green-600 hover:bg-green-700">
+                        <Button
+                          type="submit"
+                          className="bg-green-600 hover:bg-green-700"
+                        >
                           Save
                         </Button>
                         <Button
                           type="button"
                           variant="outline"
                           onClick={() => {
-                            setIsAddingEducation(false)
-                            educationForm.reset()
+                            setIsAddingEducation(false);
+                            educationForm.reset();
                           }}
                         >
                           Cancel
@@ -659,7 +775,11 @@ export default function Onboarding() {
             </FormStep>
 
             {/* Step 4: Experience */}
-            <FormStep title="Your Experience" icon={<Briefcase className="h-5 w-5" />} isActive={currentStep === 4}>
+            <FormStep
+              title="Your Experience"
+              icon={<Briefcase className="h-5 w-5" />}
+              isActive={currentStep === 4}
+            >
               <div className="space-y-4">
                 {userData.experience.length > 0 ? (
                   <div className="space-y-3">
@@ -675,14 +795,21 @@ export default function Onboarding() {
                 ) : (
                   <Card className="bg-gray-50 border border-gray-200">
                     <CardContent className="p-6 text-center">
-                      <p className="text-muted-foreground">No experience entries added yet.</p>
+                      <p className="text-muted-foreground">
+                        No experience entries added yet.
+                      </p>
                     </CardContent>
                   </Card>
                 )}
 
                 {isAddingExperience ? (
                   <Form {...experienceForm}>
-                    <form onSubmit={experienceForm.handleSubmit(handleAddExperience)} className="space-y-4">
+                    <form
+                      onSubmit={experienceForm.handleSubmit(
+                        handleAddExperience
+                      )}
+                      className="space-y-4"
+                    >
                       <FormField
                         control={experienceForm.control}
                         name="experience"
@@ -703,15 +830,18 @@ export default function Onboarding() {
                       />
 
                       <div className="flex flex-col sm:flex-row gap-2">
-                        <Button type="submit" className="bg-green-600 hover:bg-green-700">
+                        <Button
+                          type="submit"
+                          className="bg-green-600 hover:bg-green-700"
+                        >
                           Save
                         </Button>
                         <Button
                           type="button"
                           variant="outline"
                           onClick={() => {
-                            setIsAddingExperience(false)
-                            experienceForm.reset()
+                            setIsAddingExperience(false);
+                            experienceForm.reset();
                           }}
                         >
                           Cancel
@@ -734,7 +864,11 @@ export default function Onboarding() {
           </CardContent>
           <CardFooter className="flex justify-between border-t p-6 flex-col sm:flex-row gap-2">
             {currentStep > 1 ? (
-              <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={prevStep}
+                className="w-full sm:w-auto"
+              >
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 Previous
               </Button>
@@ -743,12 +877,18 @@ export default function Onboarding() {
             )}
 
             {currentStep < 4 ? (
-              <Button onClick={nextStep} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">
+              <Button
+                onClick={nextStep}
+                className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+              >
                 Next
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
-              <Button onClick={handleFinish} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">
+              <Button
+                onClick={handleFinish}
+                className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+              >
                 Complete Profile
                 <Check className="h-4 w-4 ml-2" />
               </Button>
@@ -757,5 +897,5 @@ export default function Onboarding() {
         </Card>
       </div>
     </div>
-  )
+  );
 }

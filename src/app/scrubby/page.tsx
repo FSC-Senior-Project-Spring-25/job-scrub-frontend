@@ -138,24 +138,24 @@ export default function ScrubbyChatPage() {
       if (!user) {
         return;
       }
-      
+
       const token = await user.getIdToken();
       const response = await fetch("/api/chat/conversations", {
         headers: {
           Authorization: `Bearer ${token}`,
           // Add cache control to prevent browser caching
-          "Cache-Control": "no-cache, no-store"
+          "Cache-Control": "no-cache, no-store",
         },
         credentials: "include",
       });
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error("Authentication required");
         }
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const data = await response.json();
       setConversations(data);
     } catch (err) {
@@ -425,9 +425,10 @@ export default function ScrubbyChatPage() {
     <div className="flex h-screen bg-white text-gray-800 dark:text-gray-200">
       {/* sidebar */}
       <aside
-        className={`fixed top-16 inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out border-response border-gray-200 dark:border-gray-800 bg-white  shadow-lg md:shadow-none ${
-          sidebarOpen ? "w-72" : "w-0 border-response-0 md:w-16 md:border-response"
-        }`}
+        className={`fixed top-16 inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out 
+    border-r border-t border-gray-200 dark:border-gray-800 bg-white
+    shadow-[0_4px_12px_0_rgba(0,0,0,0.05)] dark:shadow-[0_4px_12px_0_rgba(0,0,0,0.3)] md:shadow-none
+    ${sidebarOpen ? "w-72" : "w-0 md:w-16"}`}
       >
         {/* Full sidebar - visible when open or on larger screens */}
         <div

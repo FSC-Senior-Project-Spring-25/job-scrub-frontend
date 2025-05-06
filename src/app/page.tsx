@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import ReactMarkdown from "react-markdown";
+import Image from "next/image";
 
 interface Comment {
   id: string;
@@ -47,6 +48,22 @@ interface Post {
   comments: Comment[];
   userHasLiked?: boolean;
   profileIcon?: string;
+}
+
+// Helper function to check if a string is likely an image URL
+function isImageUrl(str: string): boolean {
+  // Check if the string starts with http or https and ends with an image extension
+  const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp"];
+  const isUrl = str.startsWith("http://") || str.startsWith("https://");
+
+  if (!isUrl) return false;
+
+  // Check if it ends with an image extension or contains an image hosting domain
+  return (
+    imageExtensions.some((ext) => str.toLowerCase().endsWith(ext)) ||
+    str.includes("googleusercontent.com") ||
+    str.includes("firebasestorage.googleapis.com")
+  );
 }
 
 export default function HomePage() {
@@ -72,24 +89,28 @@ export default function HomePage() {
 
   const fetchPosts = async () => {
     if (!user) return;
-  
+
     try {
       setPostsLoading(true);
       // Use the token directly from the session (which is stable)
-      const token = user.idToken || await user.getIdToken();
-      
+      const token = user.idToken || (await user.getIdToken());
+
       const response = await fetch("/api/posts", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        cache: 'no-store'
+        cache: "no-store",
       });
-  
+
       if (!response.ok) {
-        console.error("Failed to fetch posts:", response.status, response.statusText);
+        console.error(
+          "Failed to fetch posts:",
+          response.status,
+          response.statusText
+        );
         throw new Error(`Failed to fetch posts: ${response.status}`);
       }
-  
+
       const data = await response.json();
 
       const postsWithIcons = await Promise.all(
@@ -361,9 +382,10 @@ export default function HomePage() {
             className="mx-auto w-full mb-4 rounded"
           />
           <p className="text-black dark:text-foreground text-sm">
-            JobScrub simplifies your career journey with powerful tools designed to match you with the right opportunities.
-            Upload your resume, discover personalized job listings, and manage your applications — all in one place.
-            Your next career move starts here.
+            JobScrub simplifies your career journey with powerful tools designed
+            to match you with the right opportunities. Upload your resume,
+            discover personalized job listings, and manage your applications —
+            all in one place. Your next career move starts here.
           </p>
           <Link href="/signup">
             <button className="mt-4 bg-green-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-green-700">
@@ -371,7 +393,7 @@ export default function HomePage() {
             </button>
           </Link>
         </div>
-  
+
         {/* Right side: text */}
         <div className="flex-1 flex flex-col items-center text-center">
           <div className="max-w-xl mx-auto">
@@ -387,14 +409,14 @@ export default function HomePage() {
             <p className="text-gray-700 dark:text-muted-foreground text-lg mt-6 leading-relaxed font-medium">
               Your Career Journey, Simplified.
             </p>
-  
+
             {/* Bullet Points */}
             <ul className="text-gray-600 dark:text-muted-foreground text-sm mt-6 space-y-2 text-left pl-2">
               <li>• Upload your resume in seconds</li>
               <li>• Discover job matches instantly</li>
               <li>• Track and manage your applications easily</li>
             </ul>
-  
+
             {/* Buttons */}
             <div className="mt-8 flex flex-col items-center">
               <Link href="/signup">
@@ -402,7 +424,10 @@ export default function HomePage() {
                   Create an Account
                 </button>
               </Link>
-              <Link href="/login" className="mt-4 text-blue-600 dark:text-blue-400 hover:underline text-base">
+              <Link
+                href="/login"
+                className="mt-4 text-blue-600 dark:text-blue-400 hover:underline text-base"
+              >
                 Already a User? Sign In
               </Link>
             </div>
@@ -420,14 +445,28 @@ export default function HomePage() {
             <div className="bg-white dark:bg-card rounded-lg shadow p-6 mb-4 border border-gray-100 dark:border-gray-800">
               <div className="flex flex-col items-center">
                 <div
-                  className="w-24 h-24 bg-gradient-to-br from-green-100 to-gray-100 dark:from-green-900 dark:to-gray-800 rounded-full shadow-lg flex items-center justify-center text-5xl text-black dark:text-white cursor-pointer"
+                  className="w-24 h-24 bg-gradient-to-br from-green-100 to-gray-100 dark:from-green-900 dark:to-gray-800 rounded-full shadow-lg flex items-center justify-center text-5xl text-black dark:text-white cursor-pointer overflow-hidden"
                   onClick={() => navigateToProfile(user.uid)}
                 >
-                  {userProfileData?.profileIcon
-                    ? userProfileData.profileIcon
-                    : user.displayName?.charAt(0).toUpperCase() ||
-                      user.email?.charAt(0).toUpperCase() ||
-                      "U"}
+                  {userProfileData?.profileIcon ? (
+                    isImageUrl(userProfileData.profileIcon) ? (
+                      <Image
+                        src={userProfileData.profileIcon}
+                        alt={user.displayName || "Profile"}
+                        className="w-full h-full object-cover"
+                        width={96}
+                        height={96}
+                      />
+                    ) : (
+                      // If profileIcon exists but is not an image URL (e.g., an emoji or text)
+                      userProfileData.profileIcon
+                    )
+                  ) : (
+                    // Fallback to first initial of name or email
+                    user.displayName?.charAt(0).toUpperCase() ||
+                    user.email?.charAt(0).toUpperCase() ||
+                    "U"
+                  )}
                 </div>
                 <p
                   className="font-semibold mt-3 cursor-pointer hover:text-green-600 transition"
@@ -597,10 +636,24 @@ export default function HomePage() {
                   <CardContent className="p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <div
-                        className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xl font-bold text-black dark:text-white cursor-pointer"
+                        className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xl font-bold text-black dark:text-white cursor-pointer overflow-hidden"
                         onClick={() => navigateToProfile(post.author_uid)}
                       >
-                        {post.profileIcon || post.author.charAt(0)}
+                        {post.profileIcon ? (
+                          isImageUrl(post.profileIcon) ? (
+                            <Image
+                              src={post.profileIcon}
+                              alt={post.author || "Profile"}
+                              className="w-full h-full object-cover"
+                              width={96}
+                              height={96}
+                            />
+                          ) : (
+                            post.profileIcon
+                          )
+                        ) : (
+                          post.author.charAt(0)
+                        )}
                       </div>
                       <div>
                         <p
