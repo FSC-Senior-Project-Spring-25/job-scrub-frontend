@@ -15,7 +15,7 @@ import {
   arrayUnion,
   arrayRemove,
 } from 'firebase/firestore';
-import { db } from '@/app/firebase';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/app/auth-context';
 import { formatDistanceToNow } from 'date-fns';
 import NewMessagePopup from './new-message-popup';

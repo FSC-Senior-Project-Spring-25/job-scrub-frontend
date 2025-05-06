@@ -1,10 +1,11 @@
 "use client";
-export const unstable_runtimeJS = true;
-import { useState, useEffect } from 'react';
+
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../auth-context';
+import { signIn } from 'next-auth/react';
 import { Loader2 } from "lucide-react";
+import { getCookie, deleteCookie } from 'cookies-next'; 
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -12,23 +13,8 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-  const { user, loading, login } = useAuth();
 
-  // Redirect to the main page if already logged in
-  useEffect(() => {
-    if (user) {
-      router.push("/");
-    }
-  }, [user, router]);
-
-  // Prevent form display if loading or already logged in
-  if (loading || user) return (
-    <div className="flex items-center justify-center min-h-screen">
-      <Loader2 className="h-8 w-8 animate-spin" />
-    </div>
-  );
-
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: { preventDefault: () => void; }) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
@@ -40,12 +26,27 @@ export default function Login() {
     }
 
     try {
-      const result = await login(email, password);
-      
-      if (result.success) {
-        router.push('/');
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false
+      });
+      if (result?.ok) {
+        // Check if we have a redirect URL stored
+        const redirectUrl = await getCookie('redirectUrl');
+        
+        // Clear the redirect cookie
+        deleteCookie('redirectUrl');
+        
+        // Redirect to the stored URL or a default page
+        if (redirectUrl && typeof redirectUrl === 'string') {
+          router.push(redirectUrl);
+        } else {
+          router.push('/');
+        }
       } else {
-        setError(result.error || 'Invalid email or password. Please try again.');
+        // Handle login error
+        setError(result?.error || 'Login failed');
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');

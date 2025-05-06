@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/app/auth-context';
 import { getOrCreateChat, sendMessage } from '@/lib/firebase-messaging';
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/app/firebase';
+import { db } from '@/lib/firebase';
 
 interface UserInfo {
   email: string;

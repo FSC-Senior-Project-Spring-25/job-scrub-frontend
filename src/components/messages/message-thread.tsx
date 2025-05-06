@@ -15,7 +15,7 @@ import {
   updateDoc,
   arrayUnion,
 } from 'firebase/firestore';
-import { db } from '@/app/firebase';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/app/auth-context';
 
 interface Message {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { db } from "../firebase"
+import { db } from "../../lib/firebase"
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from "firebase/firestore"
 import { toast } from "sonner"
 import { useAuth } from "../auth-context"
@@ -25,10 +25,11 @@ import { ListItem } from "@/components/onboarding/list-item"
 import FileUpload from "@/components/file-upload"
 import { personalInfoSchema, educationSchema, experienceSchema } from "@/lib/schemas"
 import { updateProfile } from "firebase/auth"
+import { User as FirebaseUser } from "firebase/auth"
 
 export default function Onboarding() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user } = useAuth() as { user: FirebaseUser | null };
   const [loading, setLoading] = useState(true)
   const [currentStep, setCurrentStep] = useState(1)
   const [userData, setUserData] = useState({
@@ -348,9 +349,11 @@ export default function Onboarding() {
         isPrivate: values.isPrivate,
       })
 
-      await updateProfile(user, {
-        displayName: values.username
-      });
+      if (user) {
+        await updateProfile(user, {
+          displayName: values.username
+        });
+      }
 
       setUserData((prev) => ({
         ...prev,

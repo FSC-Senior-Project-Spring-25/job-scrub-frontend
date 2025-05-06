@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/app/auth-context';
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/app/firebase';
+import { db } from '@/lib/firebase';
 import { FaRegClock } from 'react-icons/fa';
 
 export default function ApplicationBadge() {
@@ -21,7 +21,7 @@ export default function ApplicationBadge() {
     };
 
     fetchApplications();
-  }, [user]);
+  }, [user?.id]);
 
   return (
     <Link

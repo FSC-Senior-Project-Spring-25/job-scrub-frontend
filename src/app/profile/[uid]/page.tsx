@@ -5,7 +5,7 @@ export const unstable_runtimeJS = true;
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/app/firebase";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/app/auth-context";
 import ProfileTabs from "@/components/profile/profile-tabs";
 import AnimatedLogo from "@/components/animated-logo";

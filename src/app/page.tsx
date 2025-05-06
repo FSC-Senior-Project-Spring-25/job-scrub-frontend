@@ -14,7 +14,7 @@ import AnimatedLogo from "@/components/animated-logo";
 import { Button } from "@/components/ui/button";
 import ChatPopup from "@/components/messages/chat-popup";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/app/firebase";
+import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import {
@@ -70,21 +70,26 @@ export default function HomePage() {
     router.push(`/profile/${encodedId}`);
   };
 
-  // Fetch posts from the Connect page
   const fetchPosts = async () => {
     if (!user) return;
-
+  
     try {
       setPostsLoading(true);
-      const token = await user.getIdToken();
+      // Use the token directly from the session (which is stable)
+      const token = user.idToken || await user.getIdToken();
+      
       const response = await fetch("/api/posts", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        cache: 'no-store'
       });
-
-      if (!response.ok) throw new Error("Failed to fetch posts");
-
+  
+      if (!response.ok) {
+        console.error("Failed to fetch posts:", response.status, response.statusText);
+        throw new Error(`Failed to fetch posts: ${response.status}`);
+      }
+  
       const data = await response.json();
 
       const postsWithIcons = await Promise.all(
@@ -150,13 +155,13 @@ export default function HomePage() {
       fetchFollowStats();
       fetchUserProfileData();
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
     const intervalId = setInterval(() => fetchPosts(), 5 * 60000);
     return () => clearInterval(intervalId);
-  }, [user]);
+  }, [user?.id]);
 
   async function toggleLike(postId: string) {
     if (!user) return;

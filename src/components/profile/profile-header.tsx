@@ -4,7 +4,7 @@ export const unstable_runtimeJS = true;
 
 import { useState, useEffect } from "react"
 import { doc, updateDoc } from "firebase/firestore"
-import { db } from "@/app/firebase"
+import { db } from "@/lib/firebase"
 import { useAuth } from "@/app/auth-context"
 import { toast } from "sonner"
 import {

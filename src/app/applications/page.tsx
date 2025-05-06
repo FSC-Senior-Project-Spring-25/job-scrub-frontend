@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/app/auth-context';
-import { db } from '@/app/firebase';
+import { db } from '@/lib/firebase';
 import ApplicationUpdatePrompt from "@/components/job/application-update";
 import {
   collection,
@@ -82,7 +82,7 @@ export default function MyApplicationsPage() {
     };
 
     fetchApplications();
-  }, [user]);
+  }, [user?.id]);
 
   const updateStatus = async (jobId: string, newStatus: string, prevStatus: string) => {
     if (!user?.uid || !newStatus || newStatus === prevStatus) return;

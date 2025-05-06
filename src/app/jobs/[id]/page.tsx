@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import type { Job } from "@/types/types";
 import { useAuth } from "@/app/auth-context";
-import { db } from "@/app/firebase";
+import { db } from "@/lib/firebase";
 import CompanyMetrics from "@/components/job/company-metrics";
 import {
   doc,
@@ -97,7 +97,7 @@ export default function JobDetailPage() {
       })
       .catch(err => console.error("❌ Failed to fetch job:", err))
       .finally(() => setLoading(false));
-  }, [id, user]);
+  }, [id, user?.id]);
 
   const handleSave = async () => {
     if (!user?.uid || !id) return;

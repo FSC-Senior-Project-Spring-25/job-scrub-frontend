@@ -119,7 +119,7 @@ export default function ScrubbyChatPage() {
 
   useEffect(() => {
     fetchConversations();
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -135,13 +135,28 @@ export default function ScrubbyChatPage() {
   async function fetchConversations() {
     setIsLoadingConversations(true);
     try {
-      const token = await user?.getIdToken();
-      const r = await fetch("/api/chat/conversations", {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      if (!user) {
+        return;
+      }
+      
+      const token = await user.getIdToken();
+      const response = await fetch("/api/chat/conversations", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // Add cache control to prevent browser caching
+          "Cache-Control": "no-cache, no-store"
+        },
         credentials: "include",
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Authentication required");
+        }
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
       setConversations(data);
     } catch (err) {
       console.error("Error fetching conversations", err);
@@ -154,12 +169,12 @@ export default function ScrubbyChatPage() {
     setLoading(true);
     try {
       const token = await user?.getIdToken();
-      const r = await fetch(`/api/chat/conversations/${id}`, {
+      const response = await fetch(`/api/chat/conversations/${id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: "include",
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
       setMessages(data.messages);
       setHist(data.messages);
       setCurrentConversationId(id);
@@ -175,7 +190,7 @@ export default function ScrubbyChatPage() {
     const msg = { ...first, timestamp: ensureIntTimestamp(first.timestamp) };
     try {
       const token = await user?.getIdToken();
-      const r = await fetch("/api/chat/conversations", {
+      const response = await fetch("/api/chat/conversations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -184,8 +199,8 @@ export default function ScrubbyChatPage() {
         credentials: "include",
         body: JSON.stringify({ firstMessage: msg.content, messages: [msg] }),
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
       setCurrentConversationId(data.id);
       fetchConversations();
       return data.id as string;
@@ -204,7 +219,7 @@ export default function ScrubbyChatPage() {
     }));
     try {
       const token = await user?.getIdToken();
-      const r = await fetch(`/api/chat/conversations/${id}`, {
+      const response = await fetch(`/api/chat/conversations/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -213,7 +228,7 @@ export default function ScrubbyChatPage() {
         credentials: "include",
         body: JSON.stringify({ messages: safeMsgs }),
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       fetchConversations();
     } catch (e) {
       console.error("Error updating conversation", e);
@@ -223,12 +238,12 @@ export default function ScrubbyChatPage() {
   async function deleteConversation(id: string) {
     try {
       const token = await user?.getIdToken();
-      const r = await fetch(`/api/chat/conversations/${id}`, {
+      const response = await fetch(`/api/chat/conversations/${id}`, {
         method: "DELETE",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: "include",
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setConversations((p) => p.filter((c) => c.id !== id));
       if (currentConversationId === id) {
         setMessages([]);
@@ -410,8 +425,8 @@ export default function ScrubbyChatPage() {
     <div className="flex h-screen bg-white text-gray-800 dark:text-gray-200">
       {/* sidebar */}
       <aside
-        className={`fixed top-16 inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out border-r border-gray-200 dark:border-gray-800 bg-white  shadow-lg md:shadow-none ${
-          sidebarOpen ? "w-72" : "w-0 border-r-0 md:w-16 md:border-r"
+        className={`fixed top-16 inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out border-response border-gray-200 dark:border-gray-800 bg-white  shadow-lg md:shadow-none ${
+          sidebarOpen ? "w-72" : "w-0 border-response-0 md:w-16 md:border-response"
         }`}
       >
         {/* Full sidebar - visible when open or on larger screens */}
@@ -449,7 +464,7 @@ export default function ScrubbyChatPage() {
               <div className="flex justify-center p-4">
                 <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
               </div>
-            ) : conversations.length === 0 ? (
+            ) : !Array.isArray(conversations) || conversations.length === 0 ? (
               <div className="text-center p-4 text-gray-500 dark:text-gray-400 text-sm">
                 No conversations yet
               </div>
