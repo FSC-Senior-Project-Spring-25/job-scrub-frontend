@@ -1,143 +1,112 @@
 "use client";
 
-import { createContext, useState, useEffect, useContext } from "react";
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  User,
-} from "firebase/auth";
-import { auth } from "./firebase";
+import { useSession, signOut, SessionProvider } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { ReactNode, useEffect, useState, useMemo, useCallback } from "react";
+import { auth } from "@/lib/firebase";
 
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  login: (
-    email: string,
-    password: string
-  ) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<{ success: boolean; error?: string }>;
+export default function AuthProvider({ children }: { children: ReactNode }) {
+  return <SessionProvider>{children}</SessionProvider>;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-  login: async () => ({ success: false }),
-  logout: async () => ({ success: false }),
-});
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log(
-        "Auth state changed:",
-        firebaseUser ? "user exists" : "no user"
-      );
-
-      if (firebaseUser) {
-        try {
-          // Get the ID token first
-          const idToken = await firebaseUser.getIdToken();
-          console.log("Got ID token, establishing session");
-
-          // Establish the session with FastAPI
-          const loginResponse = await fetch("/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken: idToken }),
-            credentials: "include", // Important for cookie handling
-          });
-
-          if (!loginResponse.ok) {
-            console.error(
-              "Failed to establish session:",
-              await loginResponse.text()
-            );
-            await signOut(auth);
-            setUser(null);
-          } else {
-            console.log("Session established, verifying...");
-
-            // Now verify the session
-            const verifyResponse = await fetch("/api/auth/verify", {
-              credentials: "include", // Important for cookie handling
-            });
-
-            if (!verifyResponse.ok) {
-              console.error("Session verification failed");
-              await signOut(auth);
-              setUser(null);
-            } else {
-              console.log("Session verified successfully");
-              setUser(firebaseUser);
-            }
+export function useAuth() {
+  const { data: session, status, update } = useSession();
+  const router = useRouter();
+  const loading = status === "loading";
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  
+  // Function to refresh the token when needed
+  const refreshToken = useCallback(async () => {
+    if (auth.currentUser) {
+      try {
+        const newToken = await auth.currentUser.getIdToken(true); // Force refresh
+        
+        // Update the session with the new token
+        await update({
+          ...session,
+          user: {
+            ...session?.user,
+            idToken: newToken
           }
-        } catch (error) {
-          console.error("Error setting session:", error);
-          setUser(null);
-        }
-      } else {
-        setUser(null);
+        });
+        
+        return newToken;
+      } catch (error) {
+        console.error("Failed to refresh token:", error);
+        return null;
       }
-
-      setLoading(false);
-    });
-
-    // Set up timeout as a fallback
-    timeoutId = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
-
-    return () => {
-      unsubscribe();
-      clearTimeout(timeoutId);
-    };
-  }, []);
-
-  const login = async (email: string, password: string) => {
-    setLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // No need to set user here as onAuthStateChanged will handle that
-      return { success: true };
-    } catch (error: any) {
-      setLoading(false);
-      return {
-        success: false,
-        error: error.message,
-      };
-    } finally {
-      // Don't set loading to false here, let onAuthStateChanged handle it
     }
-  };
+    return null;
+  }, [session, update]);
+  
+  // Get a fresh token, refreshing if necessary
+  const getValidToken = useCallback(async () => {
+    if (!session?.user?.idToken) return null;
+    
+    try {
+      // Check if token is expired (quick check by decoding JWT)
+      const tokenParts = session.user.idToken.split('.');
+      if (tokenParts.length !== 3) return refreshToken();
+      
+      const payload = JSON.parse(atob(tokenParts[1]));
+      const expiryTime = payload.exp * 1000; // Convert to milliseconds
+      
+      // If token expires in less than 5 minutes, refresh it
+      if (Date.now() > expiryTime - 5 * 60 * 1000) {
+        return await refreshToken();
+      }
+      
+      return session.user.idToken;
+    } catch (error) {
+      console.error("Error checking token expiration:", error);
+      return refreshToken();
+    }
+  }, [session, refreshToken]);
+  
+  useEffect(() => {
+    if (session?.user && auth.currentUser) {
+      setDisplayName(auth.currentUser.displayName || auth.currentUser.email);
+    }
+  }, [session]);
+  
+  // Create user object with proper token handling
+  const user = useMemo(() => {
+    if (!session?.user) return null;
+    
+    return {
+      ...session.user,
+      uid: session.user.id,
+      displayName: displayName || session.user.name || session.user.email,
+      email: session.user.email,
+      metadata: {
+        creationTime: auth.currentUser?.metadata?.creationTime || new Date().toISOString()
+      },
+      // Enhanced getIdToken that checks expiration and refreshes if needed
+      getIdToken: async (forceRefresh = true) => {
+        if (forceRefresh) return await refreshToken();
+        return await getValidToken();
+      }
+    };
+  }, [session, displayName, refreshToken, getValidToken]);
 
   const logout = async () => {
-    setLoading(true);
     try {
-      await signOut(auth);
-      // Call API to clear the session cookie
-      await fetch("/api/auth/logout", { method: "POST" });
+      await signOut({ redirect: false });
+      router.push("/login");
       return { success: true };
-    } catch (error: any) {
+    } catch (error) {
+      console.error("Logout error:", error);
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error",
       };
-    } finally {
-      // Don't set loading to false here, let onAuthStateChanged handle it
     }
   };
 
-  return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return {
+    user,
+    loading,
+    logout,
+    refreshToken
+  };
 }
-
-export const useAuth = () => useContext(AuthContext);
