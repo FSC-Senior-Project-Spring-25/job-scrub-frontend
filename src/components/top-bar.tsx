@@ -134,20 +134,21 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
 
             {/* User Actions */}
             <div className="flex items-center">
-              {/* Theme toggle switch */}
+              {/* Theme toggle button */}
               {mounted && (
-                <div className="flex items-center mr-8">
-                  <Moon className="mr-2 h-6 w-6 text-gray-500 dark:text-gray-400" />
-                  <Switch
-                    checked={theme === "dark"}
-                    onCheckedChange={() =>
-                      setTheme(theme === "dark" ? "light" : "dark")
-                    }
-                    className="data-[state=checked]:bg-green-600"
-                    aria-label="Toggle Theme"
-                  />
-                  <Sun className="ml-2 h-6 w-6 text-amber-500" />
-                </div>
+                <button
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  className="p-2 mr-4 rounded-full border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300"
+                  aria-label={`Switch to ${
+                    theme === "dark" ? "light" : "dark"
+                  } mode`}
+                >
+                  {theme === "dark" ? (
+                    <Sun className="h-5 w-5 text-amber-500" />
+                  ) : (
+                    <Moon className="h-5 w-5 text-gray-600" />
+                  )}
+                </button>
               )}
 
               {loading ? (
