@@ -1,441 +1,438 @@
-"use client";
+"use client"
 
-import type React from "react";
+import type React from "react"
+import { useState, useRef, useEffect, type FormEvent } from "react"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Loader2, Send, FileUp, XCircle, FileText, Bot, User, Sparkles } from "lucide-react"
+import { useAuth } from "../auth-context"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
-import { useState, useRef, type FormEvent, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Loader2,
-  Send,
-  FileUp,
-  XCircle,
-  FileText,
-  Bot,
-  User,
-  Sparkles,
-} from "lucide-react";
-import { useAuth } from "../auth-context";
-import ReactMarkdown from "react-markdown";
+// Helper function to format agent names
+const formatAgentName = (agentName: string): string => {
+  // Replace underscores with spaces and convert to title case
+  return agentName
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ")
+}
+
+function AssistantBubble({ raw }: { raw: string }) {
+  const [rendered, setRendered] = useState(raw)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setRendered(raw))
+    return () => cancelAnimationFrame(id)
+  }, [raw])
+
+  return (
+    <div className="prose prose-sm max-w-none text-sm">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: ({ node, ...props }) => (
+            <a
+              {...props}
+              className="text-green-600 underline hover:text-green-800"
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          ),
+          p: ({ node, ...props }) => <p className="mb-4" {...props} />,
+          h1: ({ node, ...props }) => <h1 className="text-xl font-bold mb-4" {...props} />,
+          h2: ({ node, ...props }) => <h2 className="text-lg font-bold mb-3" {...props} />,
+          h3: ({ node, ...props }) => <h3 className="text-md font-bold mb-3" {...props} />,
+          ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4" {...props} />,
+          ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4" {...props} />,
+          li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+          pre: ({ node, ...props }) => <pre className="bg-gray-100 p-2 rounded my-2 overflow-x-auto" {...props} />,
+          blockquote: ({ node, ...props }) => (
+            <blockquote className="border-l-4 border-green-200 pl-4 italic my-4" {...props} />
+          ),
+          strong: ({ node, ...props }) => <span className="font-bold" {...props} />,
+        }}
+      >
+        {rendered}
+      </ReactMarkdown>
+    </div>
+  )
+}
 
 interface Message {
-  role: "user" | "assistant";
-  content: string;
-  timestamp?: number;
-  resumeFile?: {
-    name: string;
-    type: string;
-  };
-  isLoading?: boolean;
-  isStreaming?: boolean;
+  role: "user" | "assistant"
+  content: string
+  timestamp?: number
+  resumeFile?: { name: string; type: string } | File | null
+  isLoading?: boolean
+  isStreaming?: boolean
+  isThinking?: boolean
+  activeAgents?: string[]
 }
 
 interface StreamEventData {
-  type: "agents_selected" | "content_chunk" | "complete" | "error";
-  agents?: string[];
-  content?: string;
-  response?: string;
-  conversation?: any[];
-  active_agents?: string;
-  error?: string;
+  event?: string 
+  type?: string
+  choices?: { delta: { content?: string } }[]
+  error?: string
+  conversation?: any[]
+  agents?: string[]
+  active_agents?: string[]
+  response?: any
 }
 
 export default function ScrubbyChatPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
-  const [conversationHistory, setConversationHistory] = useState<any[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [streamedContent, setStreamedContent] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState("")
+  const [streamBuffer, setBuffer] = useState("")
+  const [isLoading, setLoading] = useState(false)
+  const [isStreaming, setStream] = useState(false)
+  const [resumeFile, setResume] = useState<File | null>(null)
+  const [activeAgents, setActiveAgents] = useState<string[]>([]) 
+  const [conversationHistory, setHist] = useState<any[]>([])
 
-  // Auto-scroll to bottom of messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamedContent]);
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const abortController = useRef<AbortController | null>(null)
+  const { user } = useAuth()
 
-  // Update suggestions when resumeFile changes or messages reset
   useEffect(() => {
-    if (resumeFile) {
-      setSuggestions([
-        "Can you summarize my resume?",
-        "How can I improve my work experience section?",
-        "What keywords are missing for my target job?",
-      ]);
-    } else {
-      setSuggestions([]);
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      })
     }
-  }, [resumeFile, messages]);
+  }, [messages, streamBuffer])
 
-  // Clean up any active stream when component unmounts
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
+  useEffect(() => () => abortController.current?.abort(), [])
 
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() && !resumeFile) return;
+    e.preventDefault()
+    if (!input.trim() && !resumeFile) return
 
-    const userMessage: Message = {
-      role: "user",
-      content: input,
-      timestamp: Date.now(),
-      resumeFile: resumeFile ? {
-        name: resumeFile.name,
-        type: resumeFile.type,
-      } : undefined,
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
-    setIsStreaming(true);
-    setStreamedContent("");
-
-    // Add a streaming placeholder message
-    setMessages((prev) => [
-      ...prev,
+    /* -- optimistic user bubble -- */
+    setMessages((m) => [
+      ...m,
+      { role: "user", content: input, timestamp: Date.now(), resumeFile },
       {
         role: "assistant",
         content: "",
         timestamp: Date.now(),
-        isLoading: true,
-        isStreaming: true,
+        isThinking: true,
       },
-    ]);
+    ])
 
-    const userInput = input;
-    setInput("");
+    setLoading(true)
+    setStream(true)
+    setBuffer("")
+    const userInput = input
+    setInput("")
 
-    // Create a new AbortController for this request
-    abortControllerRef.current = new AbortController();
-    const { signal } = abortControllerRef.current;
+    const body = new FormData()
+    body.append("message", userInput)
+
+    // Only send the latest conversation history to avoid duplication
+    const updatedHistory = [...conversationHistory, { role: "user", content: userInput, timestamp: Date.now() }]
+    body.append("conversation_history", JSON.stringify(updatedHistory))
+
+    if (resumeFile) body.append("resume", resumeFile)
+
+    const token = await user?.getIdToken()
+    abortController.current = new AbortController()
 
     try {
-      const formData = new FormData();
-      formData.append("message", userInput);
-      formData.append(
-        "conversation_history",
-        JSON.stringify(conversationHistory)
-      );
-    
-      // Add resume file if available
-      if (resumeFile) {
-        formData.append("resume", resumeFile);
-      }
-    
-      const token = await user?.getIdToken();
-    
-      const response = await fetch(`/api/chat/`, {
+      const res = await fetch(`/api/chat/`, {
         method: "POST",
-        body: formData,
-        headers: token
-          ? {
-              Authorization: `Bearer ${token}`,
-            }
-          : {},
+        body,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         credentials: "include",
-        signal,
-      });
+        signal: abortController.current.signal,
+      })
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let assistantContent = ""
+      let receivedCompleteEvent = false
 
-      if (!response.body) {
-        throw new Error("Response body is empty");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedContent = "";
-      let selectedAgents: string[] = [];
-
-      // Process the stream
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunkStr = decoder.decode(value, { stream: true })
 
-        const chunk = decoder.decode(value, { stream: true });
-        const eventLines = chunk.split("\n\n");
+        for (const raw of chunkStr.split("\n\n")) {
+          if (!raw.startsWith("data:")) continue
+          const json = raw.replace(/^data:\s*/, "")
+          if (json === "[DONE]") continue
 
-        for (const eventLine of eventLines) {
-          if (eventLine.trim() === "" || !eventLine.startsWith("data: "))
-            continue;
-
-          const jsonData = eventLine.replace("data: ", "").trim();
-          if (jsonData === "[DONE]") continue;
-
+          let evt: StreamEventData
           try {
-            const data = JSON.parse(jsonData) as StreamEventData;
+            evt = JSON.parse(json)
+            console.log("Received event:", evt)
+          } catch (e) {
+            console.error("Failed to parse event:", e, raw)
+            continue
+          }
 
-            // Handle different event types
-            switch (data.type) {
-              case "agents_selected":
-                if (data.agents && data.agents.length > 0) {
-                  selectedAgents = data.agents;
-                  setSelectedAgent(data.agents[0]); // Use first agent as primary
+          /* --- assistant token --- */
+          const delta = evt.choices?.[0]?.delta?.content
+          if (delta) {
+            // If we're still in thinking mode, transition to streaming mode
+            setMessages((prev) => {
+              const newMessages = [...prev]
+              const assistantMsgIndex = newMessages.findIndex((m) => m.isThinking || m.isStreaming)
+              if (assistantMsgIndex !== -1) {
+                newMessages[assistantMsgIndex] = {
+                  ...newMessages[assistantMsgIndex],
+                  isThinking: false,
+                  isStreaming: true,
                 }
-                break;
+              }
+              return newMessages
+            })
 
-              case "content_chunk":
-                if (data.content) {
-                  accumulatedContent += data.content;
-                  setStreamedContent(accumulatedContent);
+            assistantContent += delta
+            setBuffer((prev) => prev + delta)
+            continue
+          }
 
-                  // Update the streaming message with current content
-                  setMessages((prev) => {
-                    const newMessages = [...prev];
-                    const streamingMsgIndex = newMessages.findIndex(
-                      (m) => m.isStreaming
-                    );
-                    if (streamingMsgIndex !== -1) {
-                      newMessages[streamingMsgIndex] = {
-                        ...newMessages[streamingMsgIndex],
-                        content: accumulatedContent,
-                      };
-                    }
-                    return newMessages;
-                  });
+          // Handle agents_selected event
+          if (evt.type === "agents_selected" && evt.agents?.length) {
+            const newActiveAgents = evt.agents
+            setActiveAgents(newActiveAgents)
+
+            // Update the thinking message to show which agents were selected
+            setMessages((prev) => {
+              const newMessages = [...prev]
+              const thinkingMsgIndex = newMessages.findIndex((m) => m.isThinking)
+              if (thinkingMsgIndex !== -1) {
+                newMessages[thinkingMsgIndex] = {
+                  ...newMessages[thinkingMsgIndex],
+                  activeAgents: newActiveAgents,
                 }
-                break;
+              }
+              return newMessages
+            })
+          }
+          // Also check for active_agents field
+          else if (evt.active_agents?.length) {
+            setActiveAgents(evt.active_agents)
 
-              case "complete":
-                // Update conversation history with the full response
-                if (data.conversation) {
-                  setConversationHistory(data.conversation);
+            // Update the thinking message with active agents
+            setMessages((prev) => {
+              const newMessages = [...prev]
+              const thinkingMsgIndex = newMessages.findIndex((m) => m.isThinking)
+              if (thinkingMsgIndex !== -1) {
+                newMessages[thinkingMsgIndex] = {
+                  ...newMessages[thinkingMsgIndex],
+                  activeAgents: evt.active_agents,
                 }
+              }
+              return newMessages
+            })
+          }
+          // Fallback to agents field if active_agents is not present
+          else if (evt.agents?.length) {
+            setActiveAgents(evt.agents)
 
-                // Set the active agent if provided
-                if (data.active_agents) {
-                  setSelectedAgent(data.active_agents.toLowerCase());
+            // Update the thinking message with agents
+            setMessages((prev) => {
+              const newMessages = [...prev]
+              const thinkingMsgIndex = newMessages.findIndex((m) => m.isThinking)
+              if (thinkingMsgIndex !== -1) {
+                newMessages[thinkingMsgIndex] = {
+                  ...newMessages[thinkingMsgIndex],
+                  activeAgents: evt.agents,
                 }
+              }
+              return newMessages
+            })
+          }
 
-                // Replace the streaming message with the final response
-                setMessages((prev) => {
-                  const finalMessages = prev.filter((m) => !m.isStreaming);
-                  return [
-                    ...finalMessages,
-                    {
-                      role: "assistant",
-                      content: data.response || accumulatedContent,
-                      timestamp: Date.now(),
-                    },
-                  ];
-                });
-                break;
+          if (evt.error) throw new Error(evt.error)
 
-              case "error":
-                // Handle server-side error without throwing
-                console.error("Server error:", data.error);
-                // Store the error in state to display to user but don't throw
-                setMessages((prev) => {
-                  const finalMessages = prev.filter((m) => !m.isStreaming);
-                  return [
-                    ...finalMessages,
-                    {
-                      role: "assistant",
-                      content: `Sorry, I couldn't process your request: ${data.error || "An unknown error occurred"}`,
-                      timestamp: Date.now(),
-                    },
-                  ];
-                });
-                
-                // Break the streaming loop after error
-                accumulatedContent = "ERROR_OCCURRED";
-                break;
-            }
-            
-            // Check if we need to break the streaming due to error
-            if (accumulatedContent === "ERROR_OCCURRED") {
-              // Exit the while loop
-              break;
-            }
-          } catch (err) {
-            console.error("Error parsing stream data:", err, jsonData);
-            // Continue processing the stream - we don't want to break on parse errors
+          // If this is the complete event, mark it so we don't process additional conversation history
+          if (evt.event === "complete") {
+            receivedCompleteEvent = true
+            console.log("Complete event received, buffer:", assistantContent) // Debug log
           }
         }
       }
-    } catch (error) {
-      console.error("Error:", error);
 
-      // Remove the streaming message and add an error message
+      // Use the accumulated content for the final message
+      const finalContent = assistantContent || streamBuffer
+      console.log("Final content before update:", finalContent) // Debug log
+
+      // Replace the streaming message with the final content
       setMessages((prev) => {
-        const finalMessages = prev.filter(
-          (m) => !m.isStreaming && !m.isLoading
-        );
+        const filtered = prev.filter((m) => !m.isStreaming && !m.isThinking)
         return [
-          ...finalMessages,
+          ...filtered,
           {
             role: "assistant",
-            content: `Error: ${
-              error instanceof Error ? error.message : "Something went wrong"
-            }`,
+            content: finalContent,
             timestamp: Date.now(),
           },
-        ];
-      });
+        ]
+      })
+
+      // Update conversation history with the final assistant message
+      setHist((prev) => [...prev, { role: "assistant", content: finalContent, timestamp: Date.now() }])
+    } catch (err) {
+      console.error("Error in chat request:", err)
+      setMessages((prev) => [
+        ...prev.filter((m) => !m.isStreaming && !m.isThinking),
+        {
+          role: "assistant",
+          content: `Error: ${String(err)}`,
+          timestamp: Date.now(),
+        },
+      ])
     } finally {
-      setIsLoading(false);
-      setIsStreaming(false);
-      abortControllerRef.current = null;
+      setLoading(false)
+      setStream(false)
+      setActiveAgents([])
+      abortController.current = null
     }
-  };
+  }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      // Get just the first file
-      const file = e.target.files[0];
-
-      // Check if it's a PDF
-      if (file.type !== "application/pdf") {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: "Please upload only PDF files for resumes.",
-            timestamp: Date.now(),
-          },
-        ]);
-        return;
-      }
-
-      // Set the resumeFile
-      setResumeFile(file);
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.type !== "application/pdf") {
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: "PDFs only, please.",
+          timestamp: Date.now(),
+        },
+      ])
+      return
     }
-  };
-
-  const removeResumeFile = () => {
-    setResumeFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
-  const renderFilePreview = (file: File) => {
-    return (
-      <div className="flex items-center justify-center h-full flex-col">
-        <FileText className="h-10 w-10 text-red-500" />
-        <span className="text-xs mt-1 text-black">PDF File</span>
-        <span className="text-xs text-gray-500">{file.name}</span>
-      </div>
-    );
-  };
+    setResume(file)
+  }
+  const triggerFileInput = () => fileInputRef.current?.click()
 
   return (
     <div className="flex flex-col h-screen bg-white">
       <div className="flex-1 overflow-hidden max-w-3xl w-full mx-auto flex flex-col p-4 gap-4">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-green-100 w-full text-center">
-              <div className="flex justify-center mb-3">
-                <div className="bg-green-50 p-3 rounded-full">
-                  <Sparkles className="h-6 w-6 text-green-600" />
+        {/* messages */}
+        <div className="flex-1 overflow-y-auto space-y-4">
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-green-100 w-full text-center">
+                <div className="flex justify-center mb-3">
+                  <div className="bg-green-50 p-3 rounded-full">
+                    <Sparkles className="h-6 w-6 text-green-600" />
+                  </div>
+                </div>
+                <h2 className="text-xl font-semibold text-green-800 mb-2 flex items-center justify-center gap-2">
+                  <FileText className="h-5 w-5" /> Scrubby
+                </h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Upload your resume (PDF only) and get personalized improvement suggestions
+                </p>
+                <div className="flex items-center justify-center gap-2 text-xs text-green-700 bg-green-50 rounded-full py-1 px-3 w-fit mx-auto">
+                  <Bot className="h-3 w-3" />
+                  <span>AI-powered feedback</span>
                 </div>
               </div>
-              <h2 className="text-xl font-semibold text-green-800 mb-2 flex items-center justify-center gap-2">
-                <FileText className="h-5 w-5" /> Scrubby
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Upload your resume (PDF only) and get personalized improvement
-                suggestions
-              </p>
-              <div className="flex items-center justify-center gap-2 text-xs text-green-700 bg-green-50 rounded-full py-1 px-3 w-fit mx-auto">
-                <Bot className="h-3 w-3" />
-                <span>AI-powered feedback</span>
-              </div>
             </div>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto space-y-4">
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${
-                message.role === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
+          )}
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
                 className={`max-w-[85%] rounded-xl p-3 ${
-                  message.role === "user"
-                    ? "bg-green-700 text-white"
-                    : "bg-white border border-green-100 shadow-sm"
+                  msg.role === "user" ? "bg-green-700 text-white" : "bg-white border border-green-100 shadow-sm"
                 }`}
               >
-                <div className="flex items-center gap-2 mb-1">
-                  {message.role === "user" ? (
+                {/* header */}
+                <div className="flex items-center gap-2 mb-1 text-xs">
+                  {msg.role === "user" ? (
                     <User className="h-4 w-4 text-green-200" />
                   ) : (
                     <Bot className="h-4 w-4 text-green-600" />
                   )}
-                  <span
-                    className={`text-xs font-medium ${
-                      message.role === "user"
-                        ? "text-green-100"
-                        : "text-green-700"
-                    }`}
-                  >
-                    {message.role === "user" ? "You" : "Scrubby"}
+                  <span className={msg.role === "user" ? "text-green-100" : "text-green-700 font-medium"}>
+                    {msg.role === "user" ? "You" : "Scrubby"}
                   </span>
-                  <span
-                    className={`text-xs ${
-                      message.role === "user"
-                        ? "text-green-200"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    {message.timestamp &&
-                      new Date(message.timestamp).toLocaleTimeString([], {
+                  {msg.timestamp && (
+                    <span className={msg.role === "user" ? "text-green-200" : "text-gray-500"}>
+                      {new Date(msg.timestamp).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
-                  </span>
+                    </span>
+                  )}
                 </div>
-                {message.role === "user" ? (
-                  <div className="whitespace-pre-wrap text-sm text-white">
-                    {message.content}
-                    {message.resumeFile && (
-                      <div className="mt-2 p-1 bg-green-600 rounded flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        <span className="text-xs">{message.resumeFile.name}</span>
+
+                {/* body */}
+                {msg.isThinking ? (
+                  <div className="whitespace-pre-wrap text-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Loader2 className="h-4 w-4 text-green-600 animate-spin" />
+                      <span className="text-sm text-green-600">
+                        {msg.activeAgents && msg.activeAgents.length > 0 ? "Thinking..." : "Thinking..."}
+                      </span>
+                    </div>
+                    {msg.activeAgents && msg.activeAgents.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {msg.activeAgents.map((agent, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-50 text-green-700"
+                          >
+                            <Bot className="h-3 w-3 mr-1" />
+                            {formatAgentName(agent)}
+                          </span>
+                        ))}
                       </div>
                     )}
                   </div>
-                ) : message.isLoading && !message.content ? (
+                ) : msg.isLoading && !msg.content ? (
                   <div className="whitespace-pre-wrap text-sm">
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 text-green-600 animate-spin" />
-                      <span className="text-sm text-green-600">
-                        Thinking...
-                      </span>
+                      <span className="text-sm text-green-600">Thinking...</span>
                     </div>
                   </div>
-                ) : message.isStreaming ? (
-                  <div className="text-sm  prose prose-sm max-w-none">
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
-                    <div className="inline-block h-4 w-4 ml-1 align-middle">
-                      <span className="inline-flex w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
-                    </div>
+                ) : msg.isStreaming ? (
+                  <AssistantBubble raw={streamBuffer} />
+                ) : msg.role === "assistant" ? (
+                  <div className="prose prose-sm max-w-none text-sm">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        a: ({ node, ...props }) => (
+                          <a
+                            {...props}
+                            className="text-green-600 underline hover:text-green-800"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          />
+                        ),
+                        p: ({ node, ...props }) => <p className="mb-4" {...props} />,
+                        h1: ({ node, ...props }) => <h1 className="text-xl font-bold mb-4" {...props} />,
+                        h2: ({ node, ...props }) => <h2 className="text-lg font-bold mb-3" {...props} />,
+                        h3: ({ node, ...props }) => <h3 className="text-md font-bold mb-3" {...props} />,
+                        ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4" {...props} />,
+                        ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4" {...props} />,
+                        li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                        pre: ({ node, ...props }) => (
+                          <pre className="bg-gray-100 p-2 rounded my-2 overflow-x-auto" {...props} />
+                        ),
+                        blockquote: ({ node, ...props }) => (
+                          <blockquote className="border-l-4 border-green-200 pl-4 italic my-4" {...props} />
+                        ),
+                        strong: ({ node, ...props }) => <span className="font-bold" {...props} />,
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
                   </div>
                 ) : (
-                  <div className="text-sm prose prose-sm max-w-none">
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
-                  </div>
+                  <div className="whitespace-pre-wrap text-sm text-white">{msg.content}</div>
                 )}
               </div>
             </div>
@@ -443,64 +440,32 @@ export default function ScrubbyChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {suggestions.length > 0 && (
-          <div className="bg-white p-3 rounded-lg border border-green-100">
-            <h3 className="text-xs font-medium text-green-700 mb-2">
-              Try asking:
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {suggestions.map((suggestion, i) => (
-                <button
-                  key={i}
-                  onClick={() => setInput(suggestion)}
-                  className="text-xs bg-green-50 hover:bg-green-100 text-green-600 px-3 py-1 rounded-full"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
+        {/* input */}
         <form
           onSubmit={handleSubmit}
-          className="sticky bottom-0 bg-white rounded-xl border border-green-100 shadow-sm p-3"
+          className="sticky bottom-0 bg-white border border-green-100 shadow-sm rounded-xl p-3 space-y-2"
         >
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask for resume improvements, job application tips..."
-            className="min-h-[60px] border-0 focus-visible:ring-1 focus-visible:ring-green-300 text-sm"
+            placeholder="Ask anything about your resume or job search…"
+            className="min-h-[60px] border-0 focus-visible:ring-green-300 text-sm"
             disabled={isLoading || isStreaming}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (input.trim() || resumeFile) {
-                  handleSubmit(e as unknown as FormEvent);
-                }
+                e.preventDefault()
+                if (input.trim() || resumeFile) handleSubmit(e as unknown as FormEvent)
               }
             }}
           />
-          <div className="flex justify-between items-center mt-2">
+          <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                accept=".pdf,application/pdf"
-              />
+              <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFile} />
               {resumeFile ? (
-                <div className="flex items-center gap-2 bg-green-50 py-1 px-3 rounded-full">
+                <div className="flex items-center gap-2 bg-green-50 px-3 py-1 rounded-full text-xs">
                   <FileText className="h-4 w-4 text-green-600" />
-                  <span className="text-xs text-green-700 truncate max-w-[150px]">
-                    {resumeFile.name}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={removeResumeFile}
-                    className="text-red-500 hover:text-red-700"
-                  >
+                  <span className="truncate max-w-[150px] text-green-700">{resumeFile.name}</span>
+                  <button type="button" onClick={() => setResume(null)} className="text-red-500 hover:text-red-700">
                     <XCircle className="h-4 w-4" />
                   </button>
                 </div>
@@ -509,50 +474,47 @@ export default function ScrubbyChatPage() {
                   type="button"
                   variant="ghost"
                   size="sm"
+                  className="text-green-700"
                   onClick={triggerFileInput}
                   disabled={isLoading || isStreaming}
-                  className="text-green-700 hover:bg-green-50 dark:hover:bg-green-700 dark:text-green-200"
                 >
-                  <FileUp className="h-4 w-4 mr-1" />
-                  <span className="text-sm font-bold">Attach PDF resume</span>
+                  <FileUp className="h-4 w-4 mr-1" /> Attach PDF resume
                 </Button>
               )}
             </div>
-
             <Button
               type="submit"
               size="sm"
-              disabled={
-                isLoading ||
-                isStreaming ||
-                (!input.trim() && !resumeFile)
-              }
               className="bg-green-600 hover:bg-green-700"
+              disabled={isLoading || isStreaming || (!input.trim() && !resumeFile)}
             >
               {isLoading || isStreaming ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  <span className="text-sm">
-                    {isLoading ? "Processing" : "Responding..."}
-                  </span>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" /> {isLoading ? "Processing" : "Responding…"}
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4 mr-1" />
-                  <span className="text-sm font-bold">Send</span>
+                  <Send className="h-4 w-4 mr-1" /> Send
                 </>
               )}
             </Button>
           </div>
         </form>
 
-        {selectedAgent && (
-          <div className="absolute top-4 right-4 text-xs bg-white rounded-full px-3 py-1 shadow-sm border border-green-200 text-green-700 flex items-center gap-1">
-            <Bot className="h-3 w-3" />
-            <span>Scrubby</span>
+        {/* active agent badge */}
+        {activeAgents && activeAgents.length > 0 && (
+          <div className="absolute top-4 right-4 flex flex-col gap-1">
+            {activeAgents.map((agent, index) => (
+              <div
+                key={index}
+                className="text-xs bg-white border border-green-200 shadow-sm rounded-full px-3 py-1 flex items-center gap-1 text-green-700"
+              >
+                <Bot className="h-3 w-3" /> {formatAgentName(agent)}
+              </div>
+            ))}
           </div>
         )}
       </div>
     </div>
-  );
+  )
 }
