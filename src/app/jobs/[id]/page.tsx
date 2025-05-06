@@ -193,7 +193,7 @@ export default function JobDetailPage() {
                 />
               </h1>
               <p className="text-gray-700 dark:text-muted-foreground text-sm mt-1">
-                {new Date(job.date).toLocaleDateString()} | {job.location}, {job.job_type}
+                {new Date(job.date).toLocaleDateString()} | {job.location?.address ?? "Unknown Location"}, {job.jobType}
               </p>
               <p className="text-gray-600 dark:text-muted-foreground text-md mt-1 font-medium">
                 {job.company}
