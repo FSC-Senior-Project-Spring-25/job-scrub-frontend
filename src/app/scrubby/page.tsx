@@ -169,10 +169,13 @@ export default function ScrubbyChatPage() {
     setLoading(true);
     try {
       const token = await user?.getIdToken();
-      const response = await fetch(`/api/chat/conversations/${id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        credentials: "include",
-      });
+      const response = await fetch(
+        `/api/chat/conversations?id=${encodeURIComponent(id)}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: "include",
+        }
+      );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       setMessages(data.messages);
@@ -219,15 +222,18 @@ export default function ScrubbyChatPage() {
     }));
     try {
       const token = await user?.getIdToken();
-      const response = await fetch(`/api/chat/conversations/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-        body: JSON.stringify({ messages: safeMsgs }),
-      });
+      const response = await fetch(
+        `/api/chat/conversations?id=${encodeURIComponent(id)}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: "include",
+          body: JSON.stringify({ messages: safeMsgs }),
+        }
+      );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       fetchConversations();
     } catch (e) {
@@ -238,11 +244,14 @@ export default function ScrubbyChatPage() {
   async function deleteConversation(id: string) {
     try {
       const token = await user?.getIdToken();
-      const response = await fetch(`/api/chat/conversations/${id}`, {
-        method: "DELETE",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        credentials: "include",
-      });
+      const response = await fetch(
+        `/api/chat/conversations?id=${encodeURIComponent(id)}`,
+        {
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: "include",
+        }
+      );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setConversations((p) => p.filter((c) => c.id !== id));
       if (currentConversationId === id) {
