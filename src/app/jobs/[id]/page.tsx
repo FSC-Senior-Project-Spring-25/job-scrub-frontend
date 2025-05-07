@@ -1,18 +1,8 @@
-'use client';
-
-export const unstable_runtimeJS = true;
-
+"use client";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import {
-  FaBriefcase,
-  FaMapMarkerAlt,
-  FaDollarSign,
-  FaRegBookmark,
-  FaCheckCircle,
-  FaRegClock,
-} from "react-icons/fa";
+import { FaRegBookmark, FaCheckCircle, FaRegClock } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import type { Job } from "@/types/types";
@@ -30,11 +20,14 @@ import {
   increment,
 } from "firebase/firestore";
 
-function keywordMatchScore(resumeKeywords: string[], jobSkills: string[]): number {
+function keywordMatchScore(
+  resumeKeywords: string[],
+  jobSkills: string[]
+): number {
   if (!resumeKeywords.length || !jobSkills.length) return 0;
-  const lowerResume = resumeKeywords.map(k => k.toLowerCase().trim());
-  const matches = jobSkills.filter(skill =>
-    lowerResume.some(keyword => skill.toLowerCase().includes(keyword))
+  const lowerResume = resumeKeywords.map((k) => k.toLowerCase().trim());
+  const matches = jobSkills.filter((skill) =>
+    lowerResume.some((keyword) => skill.toLowerCase().includes(keyword))
   );
   return matches.length / jobSkills.length;
 }
@@ -54,15 +47,21 @@ export default function JobDetailPage() {
     if (!id || !user) return;
 
     const fetchCounts = async () => {
-      const savedSnap = await getDocs(collection(db, "users", user.uid, "savedJobs"));
+      const savedSnap = await getDocs(
+        collection(db, "users", user.uid, "savedJobs")
+      );
       setSavedCount(savedSnap.size);
 
-      const appliedSnap = await getDocs(collection(db, "users", user.uid, "applications"));
+      const appliedSnap = await getDocs(
+        collection(db, "users", user.uid, "applications")
+      );
       setAppliedCount(appliedSnap.size);
     };
 
     const checkIfSaved = async () => {
-      const savedDoc = await getDoc(doc(db, "users", user.uid, "savedJobs", id as string));
+      const savedDoc = await getDoc(
+        doc(db, "users", user.uid, "savedJobs", id as string)
+      );
       if (savedDoc.exists()) setIsSaved(true);
     };
 
@@ -70,32 +69,35 @@ export default function JobDetailPage() {
     checkIfSaved();
 
     fetch("/api/job/unverified")
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         const found = data[id as string];
         if (found) {
           setJob(found);
 
           if (found.skills?.length) {
-            user.getIdToken()
-              .then(token =>
+            user
+              .getIdToken()
+              .then((token) =>
                 fetch("/api/resume/keywords", {
                   headers: { Authorization: `Bearer ${token}` },
                 })
               )
-              .then(res => res.json())
-              .then(data => {
+              .then((res) => res.json())
+              .then((data) => {
                 const resumeKeywords: string[] = data.keywords || [];
                 const score = keywordMatchScore(resumeKeywords, found.skills);
                 setMatchScore(score);
               })
-              .catch(err => console.error("❌ Failed to fetch resume keywords:", err));
+              .catch((err) =>
+                console.error("❌ Failed to fetch resume keywords:", err)
+              );
           }
         } else {
           console.warn("⚠️ Job not found for ID:", id);
         }
       })
-      .catch(err => console.error("❌ Failed to fetch job:", err))
+      .catch((err) => console.error("❌ Failed to fetch job:", err))
       .finally(() => setLoading(false));
   }, [id, user?.id]);
 
@@ -106,11 +108,11 @@ export default function JobDetailPage() {
     if (isSaved) {
       await deleteDoc(ref);
       setIsSaved(false);
-      setSavedCount(prev => Math.max(prev - 1, 0));
+      setSavedCount((prev) => Math.max(prev - 1, 0));
     } else {
       await setDoc(ref, { savedAt: new Date().toISOString() });
       setIsSaved(true);
-      setSavedCount(prev => prev + 1);
+      setSavedCount((prev) => prev + 1);
     }
   };
 
@@ -146,7 +148,7 @@ export default function JobDetailPage() {
         { merge: true }
       );
 
-      setAppliedCount(prev => prev + 1);
+      setAppliedCount((prev) => prev + 1);
     } catch (error) {
       console.error("❌ Failed to record application:", error);
     }
@@ -161,7 +163,10 @@ export default function JobDetailPage() {
       <div className="bg-white dark:bg-card dark:border dark:border-muted rounded-lg shadow p-4 h-fit self-start w-64 mr-6">
         <h2 className="font-semibold text-lg mb-4">Quick Links</h2>
         <nav className="space-y-2">
-          <Link href="/applications" className="flex px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-muted items-center">
+          <Link
+            href="/applications"
+            className="flex px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-muted items-center"
+          >
             <FaRegClock className="mr-2" /> My Job Applications
             {appliedCount > 0 && (
               <span className="ml-auto text-sm bg-gray-200 dark:bg-muted dark:text-foreground px-2 py-0.5 rounded text-gray-700">
@@ -169,7 +174,10 @@ export default function JobDetailPage() {
               </span>
             )}
           </Link>
-          <Link href="/jobs/saved" className="flex px-3 py-2 rounded hover:bg-gray-100 items-center">
+          <Link
+            href="/jobs/saved"
+            className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
+          >
             <FaRegBookmark className="mr-2" /> Saved Jobs
             {savedCount > 0 && (
               <span className="ml-auto text-sm bg-gray-200 dark:bg-muted dark:text-foreground px-2 py-0.5 rounded text-gray-700">
@@ -180,32 +188,41 @@ export default function JobDetailPage() {
         </nav>
         {job?.company && <CompanyMetrics companyName={job.company} />}
       </div>
-  
+
       {/* Main Content */}
       <main className="flex-1 flex justify-start">
-      <div className="bg-white dark:bg-card border-2 border-gray-300 dark:border-muted rounded-lg shadow p-8 space-y-8 w-full">
+        <div className="bg-white dark:bg-card border-2 border-gray-300 dark:border-muted rounded-lg shadow p-8 space-y-8 w-full">
           <div className="flex justify-between items-start">
             <div>
               <h1 className="text-4xl font-bold text-gray-900 dark:text-foreground flex items-center gap-2">
                 {job.title}
                 <FaCheckCircle
-                  className={job.verified ? "text-green-600 text-xl" : "text-gray-400 text-xl"}
+                  className={
+                    job.verified
+                      ? "text-green-600 text-xl"
+                      : "text-gray-400 text-xl"
+                  }
                 />
               </h1>
               <p className="text-gray-700 dark:text-muted-foreground text-sm mt-1">
-                {new Date(job.date).toLocaleDateString()} | {job.location?.address ?? "Unknown Location"}, {job.jobType}
+                {new Date(job.date).toLocaleDateString()} |{" "}
+                {job.location?.address ?? "Unknown Location"}, {job.jobType}
               </p>
               <p className="text-gray-600 dark:text-muted-foreground text-md mt-1 font-medium">
                 {job.company}
               </p>
-  
+
               {/* Match Score */}
               {matchScore !== null && (
                 <div className="mt-6 space-y-4">
                   <h3 className="text-md font-semibold">Am I a good fit?</h3>
                   <div className="flex items-center gap-5">
                     <div className="relative w-20 h-20">
-                      <svg className="transform -rotate-90" width="80" height="80">
+                      <svg
+                        className="transform -rotate-90"
+                        width="80"
+                        height="80"
+                      >
                         <circle
                           cx="40"
                           cy="40"
@@ -218,7 +235,13 @@ export default function JobDetailPage() {
                           cx="40"
                           cy="40"
                           r="34"
-                          stroke={matchScore < 0.3 ? "#ef4444" : matchScore < 0.6 ? "#facc15" : "#22c55e"}
+                          stroke={
+                            matchScore < 0.3
+                              ? "#ef4444"
+                              : matchScore < 0.6
+                              ? "#facc15"
+                              : "#22c55e"
+                          }
                           strokeWidth="8"
                           strokeDasharray={2 * Math.PI * 34}
                           strokeDashoffset={2 * Math.PI * 34 * (1 - matchScore)}
@@ -232,16 +255,27 @@ export default function JobDetailPage() {
                       </div>
                     </div>
                     <div className="text-sm text-gray-700 dark:text-muted-foreground font-medium">
-                      You are {(matchScore * 100).toFixed(0)}% compatible with the job description.
-                      {matchScore < 0.3 && <div className="mt-1 text-red-600">Let’s improve your resume!</div>}
-                      {matchScore >= 0.3 && matchScore < 0.6 && <div className="mt-1 text-yellow-700">We can help</div>}
-                      {matchScore >= 0.6 && <div className="mt-1 text-green-700 font-semibold">🎉 Great fit! Go get it!</div>}
+                      You are {(matchScore * 100).toFixed(0)}% compatible with
+                      the job description.
+                      {matchScore < 0.3 && (
+                        <div className="mt-1 text-red-600">
+                          Let’s improve your resume!
+                        </div>
+                      )}
+                      {matchScore >= 0.3 && matchScore < 0.6 && (
+                        <div className="mt-1 text-yellow-700">We can help</div>
+                      )}
+                      {matchScore >= 0.6 && (
+                        <div className="mt-1 text-green-700 font-semibold">
+                          🎉 Great fit! Go get it!
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
             </div>
-  
+
             {/* Apply and Save Buttons */}
             <div className="flex flex-col gap-2">
               <button
@@ -252,13 +286,15 @@ export default function JobDetailPage() {
               </button>
               <button
                 onClick={handleSave}
-                className={`${isSaved ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"} text-white font-semibold px-4 py-2 rounded`}
+                className={`${
+                  isSaved ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
+                } text-white font-semibold px-4 py-2 rounded`}
               >
                 {isSaved ? "Saved" : "Save"}
               </button>
             </div>
           </div>
-  
+
           {/* Job Description */}
           <div>
             <h2 className="text-lg font-semibold mb-1">Job Description</h2>
@@ -266,15 +302,17 @@ export default function JobDetailPage() {
               {job.description}
             </p>
           </div>
-  
+
           {/* Salary */}
           {job.salary && (
             <div>
               <h2 className="text-lg font-semibold mb-1">Salary</h2>
-              <p className="text-gray-800 dark:text-muted-foreground">{job.salary}</p>
+              <p className="text-gray-800 dark:text-muted-foreground">
+                {job.salary}
+              </p>
             </div>
           )}
-  
+
           {/* Benefits and Skills */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div>
@@ -295,17 +333,23 @@ export default function JobDetailPage() {
             </div>
           </div>
         </div>
-  
+
         {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-card dark:border dark:border-muted p-6 rounded shadow-xl space-y-4">
               <p className="text-lg font-medium">Did you apply for this job?</p>
               <div className="flex justify-end gap-4">
-                <Button onClick={() => confirmApplication(true)} className="bg-green-600 hover:bg-green-700 text-white">
+                <Button
+                  onClick={() => confirmApplication(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
                   Yes
                 </Button>
-                <Button onClick={() => confirmApplication(false)} className="bg-gray-300 dark:bg-muted dark:text-foreground text-black">
+                <Button
+                  onClick={() => confirmApplication(false)}
+                  className="bg-gray-300 dark:bg-muted dark:text-foreground text-black"
+                >
                   No
                 </Button>
               </div>
@@ -316,12 +360,3 @@ export default function JobDetailPage() {
     </div>
   );
 }
- 
- 
- 
- 
- 
- 
- 
- 
-

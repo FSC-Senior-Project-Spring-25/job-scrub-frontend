@@ -84,6 +84,7 @@ export default function HomePage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        cache: "force-cache"
       })
 
       if (!response.ok) {

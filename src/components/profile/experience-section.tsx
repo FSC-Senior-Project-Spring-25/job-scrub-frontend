@@ -1,7 +1,5 @@
 "use client"
 
-export const unstable_runtimeJS = true;
-
 import { useState, useEffect } from "react"
 import { doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore"
 import { db } from "@/lib/firebase"
