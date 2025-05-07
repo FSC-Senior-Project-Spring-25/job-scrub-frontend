@@ -472,7 +472,7 @@ export default function HomePage() {
                     <FaRegClock className="mr-2 text-green-600 dark:text-green-500" /> My Applications
                   </Link>
                   <Link
-                    href="/saved"
+                    href="/jobs/saved"
                     className="flex px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 items-center"
                   >
                     <FaRegBookmark className="mr-2 text-green-600 dark:text-green-500" /> Saved Jobs
