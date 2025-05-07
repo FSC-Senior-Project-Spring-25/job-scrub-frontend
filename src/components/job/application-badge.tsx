@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/app/auth-context';
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/app/firebase';
+import { db } from '@/lib/firebase';
 import { FaRegClock } from 'react-icons/fa';
 
 export default function ApplicationBadge() {
@@ -21,17 +21,17 @@ export default function ApplicationBadge() {
     };
 
     fetchApplications();
-  }, [user]);
+  }, [user?.id]);
 
   return (
     <Link
-      href="/applications"
-      className="flex px-3 py-2 rounded hover:bg-gray-100 items-center"
-    >
+    href="/applications"
+    className="flex items-center px-3 py-2 rounded hover:bg-gray-100 hover:text-gray-800 dark:hover:bg-muted dark:hover:text-foreground transition-colors"
+  >
       <FaRegClock className="mr-2" />
       My Job Applications
       {count > 0 && (
-        <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">
+        <span className="ml-auto text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-800">
           {count}
         </span>
       )}

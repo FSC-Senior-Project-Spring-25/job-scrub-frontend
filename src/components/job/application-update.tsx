@@ -9,7 +9,7 @@ import {
   serverTimestamp,
   getDoc,
 } from 'firebase/firestore';
-import { db } from '@/app/firebase';
+import { db } from '@/lib/firebase';
 import {
   FaPhoneAlt,
   FaThumbsUp,

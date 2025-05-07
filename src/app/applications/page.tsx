@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/app/auth-context';
-import { db } from '@/app/firebase';
+import { db } from '@/lib/firebase';
 import ApplicationUpdatePrompt from "@/components/job/application-update";
 import {
   collection,
@@ -82,7 +82,7 @@ export default function MyApplicationsPage() {
     };
 
     fetchApplications();
-  }, [user]);
+  }, [user?.id]);
 
   const updateStatus = async (jobId: string, newStatus: string, prevStatus: string) => {
     if (!user?.uid || !newStatus || newStatus === prevStatus) return;
@@ -135,38 +135,42 @@ export default function MyApplicationsPage() {
   };
 
   return (
-    <div className="p-6 w-full bg-gray-100 min-h-screen">
-      <h1 className="text-2xl font-bold mb-6">My Applications</h1>
-
+    <div className="p-6 w-full bg-gray-100 dark:bg-background min-h-screen">
+      <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-foreground">My Applications</h1>
+  
       {showCongrats && (
         <div className="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
           🎉 Congratulations! You marked this job as <strong>ACCEPTED</strong>!
         </div>
       )}
-
+  
       {loading ? (
-        <p>Loading...</p>
+        <p className="text-gray-600 dark:text-muted-foreground">Loading...</p>
       ) : applications.length === 0 ? (
-        <p className="text-gray-600">You haven’t applied to any jobs yet.</p>
+        <p className="text-gray-600 dark:text-muted-foreground">
+          You haven’t applied to any jobs yet.
+        </p>
       ) : (
         <ul className="space-y-6">
           {applications.map(({ job, app }) => (
             <li
               key={job.id}
-              className={`w-full bg-white rounded-lg p-6 shadow-sm flex justify-between items-start border-2 ${getBorderColor(app.status)}`}
+              className={`w-full bg-white dark:bg-card rounded-lg p-6 shadow-sm flex justify-between items-start border-2 dark:border-muted ${getBorderColor(app.status)}`}
             >
               <div className="flex gap-4 w-full">
                 <FaBriefcase className="text-green-600 text-xl mt-1 shrink-0" />
-
+  
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <Link href={`/jobs/${job.id}`}>
-                      <h2 className="text-xl font-semibold text-gray-800 hover:underline flex items-center gap-2">
+                      <h2 className="text-xl font-semibold text-gray-800 dark:text-foreground hover:underline flex items-center gap-2">
                         {job.title}
-                        {job.verified && <FaCheckCircle className="text-green-600 text-sm" />}
+                        {job.verified && (
+                          <FaCheckCircle className="text-green-600 text-sm" />
+                        )}
                       </h2>
                     </Link>
-
+  
                     {job.url && (
                       <a
                         href={job.url}
@@ -180,19 +184,19 @@ export default function MyApplicationsPage() {
                       </a>
                     )}
                   </div>
-
-                  <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+  
+                  <p className="text-sm text-gray-600 dark:text-muted-foreground mt-1 flex items-center gap-1">
                     <FaBuilding /> {job.company}
                   </p>
-                  <p className="text-sm text-gray-600 flex items-center gap-1">
+                  <p className="text-sm text-gray-600 dark:text-muted-foreground flex items-center gap-1">
                     <FaMapMarkerAlt /> {job.location} | {job.workType}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">
                     Applied: {app.appliedAt?.toDate?.().toLocaleDateString?.() || '—'}
                   </p>
                 </div>
               </div>
-
+  
               <div className="flex flex-col items-end justify-start min-w-[140px] ml-4 gap-2">
                 {user?.uid && (
                   <ApplicationUpdatePrompt
@@ -211,4 +215,5 @@ export default function MyApplicationsPage() {
       )}
     </div>
   );
-}
+  }
+  

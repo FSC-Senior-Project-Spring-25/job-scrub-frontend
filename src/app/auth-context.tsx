@@ -1,143 +1,203 @@
 "use client";
 
-import { createContext, useState, useEffect, useContext } from "react";
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  User,
-} from "firebase/auth";
-import { auth } from "./firebase";
+import { useSession, signOut, SessionProvider } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { ReactNode, useEffect, useState, useMemo, useCallback, createContext, useContext } from "react";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  login: (
-    email: string,
-    password: string
-  ) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<{ success: boolean; error?: string }>;
+// Extended user interface to include Firestore profile data
+export interface ExtendedUser {
+  id: string;
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  idToken: string;
+  provider?: string;
+  metadata: {
+    creationTime: string;
+  };
+  // Firestore profile fields
+  bio?: string;
+  phone?: string;
+  isPrivate?: boolean;
+  education?: string[];
+  experience?: string[];
+  resume_id?: string | null;
+  resume_filename?: string | null;
+  profileIcon?: string;
+  username?: string;
+  // Method to get a fresh token
+  getIdToken: (forceRefresh?: boolean) => Promise<string | null>;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-  login: async () => ({ success: false }),
-  logout: async () => ({ success: false }),
-});
+interface AuthContextType {
+  user: ExtendedUser | null;
+  loading: boolean;
+  profileLoading: boolean;
+  logout: () => Promise<{ success: boolean; error?: string }>;
+  refreshToken: () => Promise<string | null>;
+  refreshProfile: () => Promise<void>;
+}
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+export function AuthContextProvider({ children }: { children: ReactNode }) {
+  const { data: session, status, update } = useSession();
+  const router = useRouter();
+  const loading = status === "loading";
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileData, setProfileData] = useState<Record<string, any> | null>(null);
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log(
-        "Auth state changed:",
-        firebaseUser ? "user exists" : "no user"
-      );
-
-      if (firebaseUser) {
-        try {
-          // Get the ID token first
-          const idToken = await firebaseUser.getIdToken();
-          console.log("Got ID token, establishing session");
-
-          // Establish the session with FastAPI
-          const loginResponse = await fetch("/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken: idToken }),
-            credentials: "include", // Important for cookie handling
-          });
-
-          if (!loginResponse.ok) {
-            console.error(
-              "Failed to establish session:",
-              await loginResponse.text()
-            );
-            await signOut(auth);
-            setUser(null);
-          } else {
-            console.log("Session established, verifying...");
-
-            // Now verify the session
-            const verifyResponse = await fetch("/api/auth/verify", {
-              credentials: "include", // Important for cookie handling
-            });
-
-            if (!verifyResponse.ok) {
-              console.error("Session verification failed");
-              await signOut(auth);
-              setUser(null);
-            } else {
-              console.log("Session verified successfully");
-              setUser(firebaseUser);
-            }
-          }
-        } catch (error) {
-          console.error("Error setting session:", error);
-          setUser(null);
-        }
-      } else {
-        setUser(null);
+  // Function to fetch user profile data from Firestore
+  const fetchProfileData = useCallback(async (userId: string) => {
+    try {
+      setProfileLoading(true);
+      const userRef = doc(db, "users", userId);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        setProfileData(userSnap.data());
       }
-
-      setLoading(false);
-    });
-
-    // Set up timeout as a fallback
-    timeoutId = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
-
-    return () => {
-      unsubscribe();
-      clearTimeout(timeoutId);
-    };
+    } catch (error) {
+      console.error("Error fetching profile data:", error);
+    } finally {
+      setProfileLoading(false);
+    }
   }, []);
 
-  const login = async (email: string, password: string) => {
-    setLoading(true);
+  // Refresh profile data when needed
+  const refreshProfile = useCallback(async () => {
+    if (session?.user?.uid || session?.user?.id) {
+      await fetchProfileData(session.user.uid || session.user.id);
+    }
+  }, [session, fetchProfileData]);
+
+  // Function to refresh the token when needed
+  const refreshToken = useCallback(async () => {
+    if (auth.currentUser) {
+      try {
+        const newToken = await auth.currentUser.getIdToken(true); // Force refresh
+
+        // Update the session with the new token
+        await update({
+          ...session,
+          user: {
+            ...session?.user,
+            idToken: newToken,
+          },
+        });
+
+        return newToken;
+      } catch (error) {
+        console.error("Failed to refresh token:", error);
+        return null;
+      }
+    }
+    return null;
+  }, [session, update]);
+
+  // Get a fresh token, refreshing if necessary
+  const getValidToken = useCallback(async () => {
+    if (!session?.user?.idToken) return null;
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // No need to set user here as onAuthStateChanged will handle that
+      // Check if token is expired (quick check by decoding JWT)
+      const tokenParts = session.user.idToken.split(".");
+      if (tokenParts.length !== 3) return refreshToken();
+
+      const payload = JSON.parse(atob(tokenParts[1]));
+      const expiryTime = payload.exp * 1000; // Convert to milliseconds
+
+      // If token expires in less than 5 minutes, refresh it
+      if (Date.now() > expiryTime - 5 * 60 * 1000) {
+        return await refreshToken();
+      }
+
+      return session.user.idToken;
+    } catch (error) {
+      console.error("Error checking token expiration:", error);
+      return refreshToken();
+    }
+  }, [session, refreshToken]);
+
+  // Fetch profile data when session changes
+  useEffect(() => {
+    if (session?.user?.uid || session?.user?.id) {
+      fetchProfileData(session.user.uid || session.user.id);
+    }
+  }, [session?.user?.uid, session?.user?.id, fetchProfileData]);
+
+  // Create enhanced user object with profile data and token handling
+  const user = useMemo(() => {
+    if (!session?.user) return null;
+
+    const uid = session.user.uid || session.user.id;
+    
+    return {
+      ...session.user,
+      uid,
+      // Prefer profile values over session values when available
+      displayName: profileData?.username || session.user.displayName || "",
+      email: session.user.email ?? null,
+      photoURL: profileData?.profileIcon || session.user.photoURL,
+      provider: session.user.provider || "credentials",
+      // Include all profile data from Firestore
+      ...(profileData || {}),
+      metadata: {
+        creationTime: auth.currentUser?.metadata?.creationTime || new Date().toISOString(),
+      },
+      // Enhanced getIdToken that checks expiration and refreshes if needed
+      getIdToken: async (forceRefresh = false) => {
+        if (forceRefresh) return await refreshToken();
+        return await getValidToken();
+      },
+    };
+  }, [session, profileData, refreshToken, getValidToken]);
+
+  const logout = async () => {
+    try {
+      await signOut({ redirect: false });
+      router.push("/");
       return { success: true };
-    } catch (error: any) {
-      setLoading(false);
+    } catch (error) {
+      console.error("Logout error:", error);
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error",
       };
-    } finally {
-      // Don't set loading to false here, let onAuthStateChanged handle it
     }
   };
 
-  const logout = async () => {
-    setLoading(true);
-    try {
-      await signOut(auth);
-      // Call API to clear the session cookie
-      await fetch("/api/auth/logout", { method: "POST" });
-      return { success: true };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    } finally {
-      // Don't set loading to false here, let onAuthStateChanged handle it
-    }
+  const contextValue = {
+    user,
+    loading: loading || profileLoading,
+    profileLoading,
+    logout,
+    refreshToken,
+    refreshProfile,
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => useContext(AuthContext);
+export default function AuthProvider({ children }: { children: ReactNode }) {
+  return (
+    <SessionProvider>
+      <AuthContextProvider>{children}</AuthContextProvider>
+    </SessionProvider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}

@@ -1,79 +1,58 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
 export async function middleware(request: NextRequest) {
-  // Get the session cookie
-  const sessionCookie = request.cookies.get('session')?.value;
-
+  // Get the pathname of the request
+  const path = request.nextUrl.pathname;
+  
   // Public paths that don't require authentication
-  const publicPaths = ['/login', '/signup', '/', '/api'];
-  const isPublicPath = publicPaths.some(path => 
-    request.nextUrl.pathname === path || 
-    request.nextUrl.pathname.startsWith(path + '/')
+  const publicPaths = ['/login', '/signup', '/', '/api/auth'];
+  
+  // Check if the current path is public
+  const isPublicPath = publicPaths.some(publicPath => 
+    path === publicPath || 
+    path.startsWith(publicPath + '/')
   );
-
-  // Allow public paths and static files
-  if (isPublicPath || request.nextUrl.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
-    // If user is logged in and tries to access login/signup, redirect to home
-    // if (sessionCookie && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
-    //   return NextResponse.redirect(new URL('/', request.url));
-    // }
+  
+  // Allow public paths and static files without JWT verification
+  if (isPublicPath) {
     return NextResponse.next();
   }
-
-  // If no session cookie and not a public path, redirect to login
-  if (!sessionCookie) {
-    // Store the attempted URL to redirect back after login
-    const response = NextResponse.redirect(new URL('/login', request.url));
-    response.cookies.set('returnTo', request.nextUrl.pathname);
-    return response;
+  
+  // Check if the user is authenticated - only if needed
+  const token = await getToken({ 
+    req: request, 
+    secret: process.env.NEXTAUTH_SECRET 
+  });
+  
+  // If the user is authenticated, allow the request
+  if (token) {
+    return NextResponse.next();
   }
-
-  try {
-    // Verify session with FastAPI through Next.js API route
-    const apiUrl = new URL('/api/auth/verify', request.url).toString();
-    
-    // Add debugging
-    console.log(`[middleware] Verifying session at ${apiUrl}`);
-    
-    const verifyResponse = await fetch(apiUrl, {
-      headers: {
-        Cookie: `session=${sessionCookie}`,
-      },
-      cache: 'no-store', // Prevent caching issues
-    });
-
-    // Add response status debugging
-    console.log(`[middleware] Verification response status: ${verifyResponse.status}`);
-    
-    const responseData = await verifyResponse.json();
-    console.log(`[middleware] Verification response:`, responseData);
-
-    if (!verifyResponse.ok || !responseData.valid) {
-      console.error('[middleware] Session verification failed:', responseData);
-      // Invalid session - clear cookie and redirect to login
-      const response = NextResponse.redirect(new URL('/login', request.url));
-      response.cookies.delete('session');
-      return response;
-    }
-
-    // Session is valid - allow request
-    const response = NextResponse.next();
-    
-    // Don't attempt to set Cookie header here as it's not the correct approach
-    // The session cookie is already in the browser and will be sent with subsequent requests
-    
-    return response;
-  } catch (error) {
-    console.error('[middleware] Verification error:', error);
-    // On error, redirect to login
-    const response = NextResponse.redirect(new URL('/login', request.url));
-    response.cookies.delete('session');
-    return response;
-  }
+  
+  // User is not authenticated and trying to access a protected route
+  // Create redirect URL to login page
+  const redirectUrl = new URL('/login', request.url);
+  
+  // Add the original URL as a searchParam for post-login redirect
+  redirectUrl.searchParams.set('callbackUrl', request.url);
+  
+  // Create a response that redirects to the login page
+  const response = NextResponse.redirect(redirectUrl);
+  
+  // Store the URL they tried to visit in a cookie (as backup)
+  response.cookies.set('redirectUrl', request.url, {
+    httpOnly: true,
+    maxAge: 60 * 10, // 10 minutes
+    path: '/',
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  });
+  
+  return response;
 }
 
-// Update matcher to be more specific
+
 export const config = {
   matcher: [
     /*
@@ -82,8 +61,7 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder files
-     * - api auth routes (handled separately)
      */
-    '/((?!_next/static|_next/image|favicon.ico|public/|assets/|api/auth/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public/|assets/).*)',
   ],
 };
