@@ -78,7 +78,7 @@ export default function HomePage() {
     try {
       setPostsLoading(true)
       // Use the token directly from the session (which is stable)
-      const token = user.idToken || (await user.getIdToken())
+      const token = await user.getIdToken()
 
       const response = await fetch("/api/posts", {
         headers: {
