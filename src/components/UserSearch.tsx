@@ -31,7 +31,6 @@ export default function UserSearch() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
   /** fetch (debounced) */
   useEffect(() => {
     if (!query.trim()) {
@@ -41,10 +40,7 @@ export default function UserSearch() {
     const timer = setTimeout(async () => {
       try {
         setLoading(true);
-        const base = process.env.NEXT_PUBLIC_API_BASE_URL;
-        const res = await fetch(
-          `http://localhost:8000/users/search?q=${encodeURIComponent(query)}`
-        );
+        const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
         if (!res.ok) throw new Error(`API ${res.status}`);
         const data = await res.json();
         setResults(data.results);
@@ -59,8 +55,6 @@ export default function UserSearch() {
 
   /** handle click on a result (wire up navigation later) */
   const onResultClick = (user: UserProfile) => {
-    // TODO: navigate to /profile/${user.id}
-    // router.push(`/profile/${user.id}`)
     console.log("Clicked:", user);
     setQuery("");
     setResults([]);
