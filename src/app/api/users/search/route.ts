@@ -5,14 +5,14 @@ export async function GET(request: NextRequest) {
     // Get the search query from URL parameters
     const searchQuery = request.nextUrl.searchParams.get("q");
     
-    if (!searchQuery || searchQuery.trim().length < 2) {
+    if (!searchQuery) {
       return NextResponse.json(
         { results: [], message: "Search query too short" },
         { status: 400 }
       );
     }
     
-    const response = await fetch(`${process.env.API_URL}/search?q=${encodeURIComponent(searchQuery)}`, {
+    const response = await fetch(`${process.env.API_URL}/users/search?q=${encodeURIComponent(searchQuery)}`, {
       headers: {
         'Content-Type': 'application/json',
       },

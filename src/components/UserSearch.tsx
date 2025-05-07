@@ -55,8 +55,6 @@ export default function UserSearch() {
 
   /** handle click on a result (wire up navigation later) */
   const onResultClick = (user: UserProfile) => {
-    // TODO: navigate to /profile/${user.id}
-    // router.push(`/profile/${user.id}`)
     console.log("Clicked:", user);
     setQuery("");
     setResults([]);
