@@ -1,7 +1,5 @@
 "use client";
 
-export const unstable_runtimeJS = true;
-
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { doc, updateDoc } from "firebase/firestore";
