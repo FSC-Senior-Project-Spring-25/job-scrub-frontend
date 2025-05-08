@@ -150,7 +150,7 @@ export default function ProfileHeader({
         profileIcon: formData.profileIcon,
         isPrivate: formData.isPrivate,
       });
-      
+
       toast.success("Profile updated successfully");
       setEditing(false);
     } catch (error) {
@@ -184,7 +184,7 @@ export default function ProfileHeader({
         ...prev,
         isPrivate: !prev.isPrivate,
       }));
-      
+
       toast.success(
         `Profile is now ${!formData.isPrivate ? "private" : "public"}`
       );
@@ -288,13 +288,13 @@ export default function ProfileHeader({
               {formData.profileIcon ? (
                 isImageUrl(formData.profileIcon) ? (
                   // If profileIcon is an image URL, display it as an image
-<Image
-                        src={formData.profileIcon}
-                        alt={formData.username || "Profile"}
-                        className="w-full h-full object-cover"
-                        width={96}
-                        height={96}
-                      />
+                  <Image
+                    src={formData.profileIcon}
+                    alt={formData.username || "Profile"}
+                    className="w-full h-full object-cover"
+                    width={96}
+                    height={96}
+                  />
                 ) : (
                   // If profileIcon is not a URL (e.g., emoji), display it as text
                   <span className="text-6xl md:text-7xl">
