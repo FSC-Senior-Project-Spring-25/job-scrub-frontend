@@ -83,8 +83,9 @@ export default function JobsContent() {
   useEffect(() => {
     const searchQuery = searchParams.get("search");
     
-    // Only set search if it's different to avoid unnecessary re-renders
-    if (searchQuery !== search) {
+    // Only update search from URL params when navigating to the page
+    // NOT when the user is actively typing in the search field
+    if (searchQuery !== null && searchQuery !== search) {
       setSearch(searchQuery || "");
     }
     
@@ -121,7 +122,7 @@ export default function JobsContent() {
     } else {
       fetchJobs();
     }
-  }, [searchParams, search, filters, userLocation]);
+  }, [searchParams, filters, userLocation]);
 
   // Get user's current location
   const getCurrentLocation = () => {
