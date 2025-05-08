@@ -5,6 +5,21 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { FaSearch } from "react-icons/fa";
 
+function isImageUrl(str: string): boolean {
+  if (!str) return false;
+
+  const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp"];
+  const isUrl = str.startsWith("http://") || str.startsWith("https://");
+
+  if (!isUrl) return false;
+
+  return (
+    imageExtensions.some((ext) => str.toLowerCase().endsWith(ext)) ||
+    str.includes("googleusercontent.com") ||
+    str.includes("firebasestorage.googleapis.com")
+  );
+}
+
 interface UserProfile {
   id: string;
   username?: string;
@@ -40,7 +55,9 @@ export default function UserSearch() {
     const timer = setTimeout(async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(
+          `/api/users/search?q=${encodeURIComponent(query)}`
+        );
         if (!res.ok) throw new Error(`API ${res.status}`);
         const data = await res.json();
         setResults(data.results);
@@ -82,14 +99,36 @@ export default function UserSearch() {
             <li
               key={user.id}
               onClick={() => onResultClick(user)}
-              className="px-3 py-2 hover:bg-gray-50 cursor-pointer flex items-start"
+              className="px-3 py-2 hover:bg-gray-50 cursor-pointer flex items-center"
             >
-              {user.profileIcon && (
-                <span className="text-xl mr-2">{user.profileIcon}</span>
-              )}
+              <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center mr-3 flex-shrink-0">
+                {user.profileIcon ? (
+                  isImageUrl(user.profileIcon) ? (
+                    // If profileIcon is an image URL, render it as an image
+                    <img
+                      src={user.profileIcon}
+                      alt={user.username || user.email}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    // If profileIcon is not a URL (e.g., an emoji), display as text
+                    <span className="text-lg">{user.profileIcon}</span>
+                  )
+                ) : (
+                  // Fallback to first letter of username/email
+                  <span className="text-sm font-semibold">
+                    {(user.username || user.email).charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
               <div className="text-sm leading-snug">
                 <div className="font-medium">{user.username || user.email}</div>
-                <div className="text-gray-500">{user.email}</div>
+                <div className="text-gray-500 text-xs">{user.email}</div>
+                {user.bio && (
+                  <div className="text-xs text-gray-400 mt-1 line-clamp-1">
+                    {user.bio}
+                  </div>
+                )}
               </div>
             </li>
           ))}

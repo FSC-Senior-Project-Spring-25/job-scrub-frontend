@@ -6,6 +6,21 @@ import { getOrCreateChat, sendMessage } from '@/lib/firebase-messaging';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+function isImageUrl(str: string): boolean {
+  if (!str) return false;
+
+  const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp"];
+  const isUrl = str.startsWith("http://") || str.startsWith("https://");
+
+  if (!isUrl) return false;
+
+  return (
+    imageExtensions.some((ext) => str.toLowerCase().endsWith(ext)) ||
+    str.includes("googleusercontent.com") ||
+    str.includes("firebasestorage.googleapis.com")
+  );
+}
+
 interface UserInfo {
   email: string;
   isPrivate?: boolean;
@@ -72,9 +87,29 @@ export default function NewMessagePopup({
       onClick={() => setSelectedUser(userData)}
       className="cursor-pointer px-2 py-2 hover:bg-gray-100 rounded flex items-center gap-3"
     >
-      <div className="w-9 h-9 rounded-full bg-gray-200 text-center flex items-center justify-center text-lg font-medium text-gray-600 shrink-0">
-        {userData.profileIcon || userData.email.charAt(0).toUpperCase()}
-      </div>
+      <div className="w-9 h-9 rounded-full bg-gray-200 text-center flex items-center justify-center text-lg font-medium text-gray-600 shrink-0 overflow-hidden">
+      {userData.profileIcon ? (
+        isImageUrl(userData.profileIcon) ? (
+          // If profileIcon is an image URL, render it as an image
+          <img
+            src={userData.profileIcon}
+            alt={userData.email}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              // On error, replace with first letter of email
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.parentElement!.innerText = userData.email.charAt(0).toUpperCase();
+            }}
+          />
+        ) : (
+          // If profileIcon is not a URL (e.g., emoji), display as text
+          userData.profileIcon
+        )
+      ) : (
+        // Fallback to first letter of email
+        userData.email.charAt(0).toUpperCase()
+      )}
+    </div>
       <div className="flex flex-col">
       <span className="text-sm font-medium text-gray-900">{userData.email}</span>
     </div>
