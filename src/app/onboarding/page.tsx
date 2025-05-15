@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { db, auth } from "../../lib/firebase";
+import { db } from "../../lib/firebase";
 import {
   doc,
   updateDoc,
@@ -210,14 +210,16 @@ export default function Onboarding() {
     fetchUserData();
   }, [user?.uid, router, personalInfoForm]);
 
-  // Handle resume upload
-  const handleUpload = async () => {
-    if (!selectedFile || !user) return;
+  const handleUpload = async (file?: File) => {
+    // Use the passed file or fall back to selectedFile state
+    const fileToUpload = file || selectedFile;
+
+    if (!fileToUpload || !user) return;
 
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append("file", selectedFile);
+      formData.append("file", fileToUpload);
       formData.append("user_id", user.uid);
 
       const token = await user.getIdToken();
@@ -233,13 +235,12 @@ export default function Onboarding() {
       }
 
       const data = await response.json();
-      console.log("Upload response:", data); // Debug log
 
       // Update Firestore with the resume ID and filename
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         resume_id: data.file_id,
-        resume_filename: data.filename || selectedFile.name,
+        resume_filename: data.filename || fileToUpload.name,
       });
 
       // Update local state
@@ -247,7 +248,7 @@ export default function Onboarding() {
         ...prev,
         resume_id: data.file_id,
       }));
-      setResumeFileName(data.filename || selectedFile.name);
+      setResumeFileName(data.filename || fileToUpload.name);
 
       toast.success("Resume uploaded successfully");
 
@@ -288,6 +289,8 @@ export default function Onboarding() {
       // Reset state
       setPreviewUrl(null);
       setResumeFileName(null);
+      setSelectedFile(null);
+      setUploading(false);
       setUserData((prev) => ({
         ...prev,
         resume_id: null,
@@ -631,52 +634,45 @@ export default function Onboarding() {
                         </Button>
                       </div>
 
-                      <div className="flex flex-col items-center justify-center rounded-md bg-muted p-6">
-                        <FileText className="mb-3 h-16 w-16 text-green-600" />
-                        <p className="text-center font-medium mb-1">
-                          {resumeFileName || "Resume"}
-                        </p>
-                        <p className="text-sm text-muted-foreground mb-4 text-center">
-                          Click the button below to view your resume in a new
-                          window
-                        </p>
-                        <Button
-                          variant="default"
-                          size="lg"
-                          className="bg-green-600 hover:bg-green-700"
-                          asChild
-                        >
-                          <a
-                            href={previewUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2"
-                          >
-                            <FileText className="h-4 w-4" />
-                            View Resume
-                          </a>
-                        </Button>
+                      <div className="flex flex-col items-center justify-center rounded-md bg-muted p-4">
+                        <div className="flex items-center gap-2 w-full mb-3">
+                          <FileText className="h-5 w-5 text-green-600" />
+                          <p className="font-medium">
+                            {resumeFileName || "Resume"}
+                          </p>
+                        </div>
+
+                        {/* PDF Preview using iframe */}
+                        <div className="w-full rounded-md overflow-hidden border border-gray-200 bg-white h-[400px]">
+                          <iframe
+                            src={previewUrl}
+                            className="w-full h-full"
+                            title="Resume Preview"
+                            allowFullScreen
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
                 ) : (
                   <>
                     <FileUpload
-                      onFileChange={setSelectedFile}
-                      acceptedFileTypes={{ "application/pdf": [".pdf"] }}
+                      onFileChange={(file) => {
+                        setSelectedFile(file);
+                        handleUpload(file);
+                      }}
                       maxSize={5 * 1024 * 1024} // 5MB
                       label="Upload Resume"
                       description="Drag & drop your resume here or click to upload"
+                      disabled={uploading}
                     />
-
-                    {selectedFile && (
-                      <Button
-                        onClick={handleUpload}
-                        disabled={uploading}
-                        className="bg-green-600 hover:bg-green-700 w-full md:w-auto"
-                      >
-                        {uploading ? "Uploading..." : "Upload Resume"}
-                      </Button>
+                    {uploading && (
+                      <div className="flex items-center justify-center mt-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mr-2"></div>
+                        <p className="text-sm text-muted-foreground">
+                          Uploading your resume...
+                        </p>
+                      </div>
                     )}
                   </>
                 )}

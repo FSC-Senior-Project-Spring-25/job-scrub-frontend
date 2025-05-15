@@ -1,35 +1,40 @@
-import { useState } from "react"
+import React, { useState } from "react"
 import { useDropzone } from "react-dropzone"
-import { UploadCloud, File, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { UploadCloud, FileText } from 'lucide-react'
 
 interface FileUploadProps {
-  onFileChange: (file: File | null) => void
-  acceptedFileTypes?: Record<string, string[]>
+  onFileChange: (file: File) => void
   maxSize?: number
-  label?: string
-  description?: string
-  className?: string
+  label: string
+  description: string
+  disabled?: boolean
 }
 
-export const FileUpload = ({
-  onFileChange,
-  acceptedFileTypes = { "application/pdf": [".pdf"] },
-  maxSize = 5242880, // 5MB default
-  label = "Upload File",
-  description = "Drag & drop your file here or click to upload",
-  className = "",
-}: FileUploadProps) => {
+const FileUpload: React.FC<FileUploadProps> = ({ 
+  onFileChange, 
+  maxSize = 5 * 1024 * 1024,
+  label,
+  description,
+  disabled = false
+}) => {
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const acceptedFileTypes = {
+    "application/pdf": [".pdf"],
+  }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: acceptedFileTypes,
     maxSize,
+    maxFiles: 1,
+    multiple: false,
+    disabled,
     onDrop: (acceptedFiles: File[]) => {
       if (acceptedFiles.length > 0) {
-        setFile(acceptedFiles[0])
-        onFileChange(acceptedFiles[0])
+        const selectedFile = acceptedFiles[0]
+        setFile(selectedFile)
+        onFileChange(selectedFile) // This will trigger the upload in the parent component
         setError(null)
       }
     },
@@ -39,65 +44,51 @@ export const FileUpload = ({
         setError(`File is too large. Max size is ${maxSize / 1024 / 1024}MB.`)
       } else if (rejection.errors[0].code === "file-invalid-type") {
         setError("Invalid file type. Please upload a PDF.")
+      } else if (rejection.errors[0].code === "too-many-files") {
+        setError("Only one file can be uploaded at a time.")
       } else {
         setError("Error uploading file. Please try again.")
       }
     },
   })
 
-  const removeFile = () => {
-    setFile(null)
-    onFileChange(null)
-    setError(null)
-  }
-
   return (
-    <div className={`w-full ${className}`}>
-      {!file ? (
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg h-60 cursor-pointer transition-colors hover:border-primary/50 hover:bg-muted/50 ${
-            isDragActive ? "border-primary bg-primary/10" : "border-border"
-          }`}
-        >
-          <div className="flex h-full flex-col items-center justify-center p-6">
-            <input {...getInputProps()} />
-            <UploadCloud className="mb-2 h-12 w-12 text-muted-foreground" />
-            <p className="text-lg font-medium text-foreground">{label}</p>
-            <p className="mt-1 text-center text-sm text-muted-foreground">{description}</p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {Object.entries(acceptedFileTypes)
-                .map(([type, extensions]) => extensions.join(", "))
-                .join(" or ")}{" "}
-              files only
-            </p>
-            {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+    <div className="w-full">
+      {/* Label above the dropzone */}
+      <div className="mb-2">
+        <p className="text-sm font-medium text-gray-700">{label}</p>
+        <p className="text-xs text-gray-500">{description}</p>
+      </div>
+      
+      {/* Dropzone */}
+      <div 
+        {...getRootProps()} 
+        className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors
+          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+          ${isDragActive ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-gray-400'}`}
+      >
+        <input {...getInputProps()} />
+        {isDragActive ? (
+          <p className="text-green-500">Drop the file here...</p>
+        ) : (
+          <div className="space-y-2">
+            <UploadCloud className="mx-auto h-10 w-10 text-gray-400" />
+            <p className="text-sm text-gray-500">Drag 'n' drop a PDF file here, or click to select file</p>
+            <p className="text-xs text-gray-400">PDF only, max {maxSize / 1024 / 1024}MB</p>
           </div>
-        </div>
-      ) : (
-        <div className="h-60 border border-border rounded-lg bg-background">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  removeFile()
-                }}
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-destructive"
-                aria-label="Remove file"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className="flex flex-col items-center justify-center flex-grow rounded-md bg-muted p-4">
-              <File className="mb-3 h-12 w-12 text-primary" />
-              <p className="break-all text-center font-medium text-foreground">{file.name}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-            </div>
-          </div>
+        )}
+      </div>
+      
+      {/* Error message */}
+      {error && (
+        <p className="mt-2 text-sm text-red-600">{error}</p>
+      )}
+      
+      {/* Selected file info */}
+      {file && (
+        <div className="mt-2 text-sm flex items-center text-gray-700">
+          <FileText className="h-4 w-4 mr-1 text-green-500" />
+          <span>Selected: {file.name}</span>
         </div>
       )}
     </div>
@@ -105,4 +96,3 @@ export const FileUpload = ({
 }
 
 export default FileUpload
-
