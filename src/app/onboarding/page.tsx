@@ -144,7 +144,7 @@ export default function Onboarding() {
   useEffect(() => {
     const fetchUserData = async () => {
       if (!user) {
-        router.push("/login");
+        router.push("/");
         return;
       }
 
