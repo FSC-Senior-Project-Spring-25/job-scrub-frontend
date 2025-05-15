@@ -104,7 +104,7 @@ export default function Home() {
       setShowOnlyMatched(false);
       setActiveTab("all");
     } catch (err: any) {
-      setError(err.message || "An error occurred.");
+      setError(err.message || "An error occurred. Please ensure the PDF has text.");
     } finally {
       setLoading(false);
     }
@@ -415,12 +415,6 @@ export default function Home() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div>
-              <CardTitle>Resume</CardTitle>
-              <CardDescription>
-                Upload your resume in PDF or DOCX format
-              </CardDescription>
-            </div>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
