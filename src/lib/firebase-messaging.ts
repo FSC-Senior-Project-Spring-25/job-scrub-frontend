@@ -12,7 +12,7 @@ import {
   updateDoc,
   arrayUnion,
 } from 'firebase/firestore';
-import { db } from '@/app/firebase';
+import { db } from '@/lib/firebase';
 
 /**
  * Get or create a 1-on-1 chat between two users

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/app/firebase";
+import { db } from "@/lib/firebase";
 
 const LOGO_DEV_API_KEY = process.env.NEXT_PUBLIC_LOGO_DEV_API_KEY!;
 

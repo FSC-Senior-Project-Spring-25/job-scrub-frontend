@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { doc, updateDoc } from "firebase/firestore"
-import { db } from "@/app/firebase"
+import { db } from "@/lib/firebase"
 import { toast } from "sonner"
 import { FileText, Upload, Trash2, Download, Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"

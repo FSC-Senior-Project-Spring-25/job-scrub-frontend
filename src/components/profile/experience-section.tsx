@@ -1,10 +1,8 @@
 "use client"
 
-export const unstable_runtimeJS = true;
-
 import { useState, useEffect } from "react"
 import { doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore"
-import { db } from "@/app/firebase"
+import { db } from "@/lib/firebase"
 import { toast } from "sonner"
 import { Briefcase, Plus, Trash2, Building } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"

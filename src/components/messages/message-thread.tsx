@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from "react";
 import {
   doc,
   onSnapshot,
@@ -14,9 +14,25 @@ import {
   where,
   updateDoc,
   arrayUnion,
-} from 'firebase/firestore';
-import { db } from '@/app/firebase';
-import { useAuth } from '@/app/auth-context';
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/app/auth-context";
+import Image from "next/image";
+
+function isImageUrl(str: string): boolean {
+  if (!str) return false;
+
+  const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp"];
+  const isUrl = str.startsWith("http://") || str.startsWith("https://");
+
+  if (!isUrl) return false;
+
+  return (
+    imageExtensions.some((ext) => str.toLowerCase().endsWith(ext)) ||
+    str.includes("googleusercontent.com") ||
+    str.includes("firebasestorage.googleapis.com")
+  );
+}
 
 interface Message {
   id: string;
@@ -29,16 +45,18 @@ interface Message {
 export default function MessageThread({ chatId }: { chatId: string }) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [otherUserEmail, setOtherUserEmail] = useState<string | null>(null);
-  const [otherUserProfileIcon, setOtherUserProfileIcon] = useState<string | null>(null);
+  const [otherUserProfileIcon, setOtherUserProfileIcon] = useState<
+    string | null
+  >(null);
   const [otherUsername, setOtherUsername] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!chatId || !user?.email) return;
 
-    const chatRef = doc(db, 'chats', chatId);
+    const chatRef = doc(db, "chats", chatId);
     const unsubscribeChat = onSnapshot(chatRef, async (snapshot) => {
       const data = snapshot.data();
       if (!data) return;
@@ -47,7 +65,10 @@ export default function MessageThread({ chatId }: { chatId: string }) {
       setOtherUserEmail(otherEmail || null);
 
       if (otherEmail) {
-        const q = query(collection(db, 'users'), where('email', '==', otherEmail));
+        const q = query(
+          collection(db, "users"),
+          where("email", "==", otherEmail)
+        );
         const userSnap = await getDocs(q);
         if (!userSnap.empty) {
           const userData = userSnap.docs[0].data();
@@ -63,8 +84,8 @@ export default function MessageThread({ chatId }: { chatId: string }) {
       }
     });
 
-    const messagesRef = collection(db, 'chats', chatId, 'messages');
-    const qMessages = query(messagesRef, orderBy('createdAt', 'asc'));
+    const messagesRef = collection(db, "chats", chatId, "messages");
+    const qMessages = query(messagesRef, orderBy("createdAt", "asc"));
     const unsubscribeMessages = onSnapshot(qMessages, (snapshot) => {
       const msgs: Message[] = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -75,8 +96,11 @@ export default function MessageThread({ chatId }: { chatId: string }) {
       // Mark all unread messages as seen when opening
       snapshot.docs.forEach(async (docSnap) => {
         const data = docSnap.data();
-        if (data.sender !== user?.email && !(data.readBy || []).includes(user?.email)) {
-          await updateDoc(doc(db, 'chats', chatId, 'messages', docSnap.id), {
+        if (
+          data.sender !== user?.email &&
+          !(data.readBy || []).includes(user?.email)
+        ) {
+          await updateDoc(doc(db, "chats", chatId, "messages", docSnap.id), {
             readBy: arrayUnion(user?.email),
           });
         }
@@ -90,36 +114,37 @@ export default function MessageThread({ chatId }: { chatId: string }) {
   }, [chatId, user?.email]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const sendMessage = async () => {
     if (!input.trim() || !user) return;
-  
-    const messagesRef = collection(db, 'chats', chatId, 'messages');
 
-    const chatRef = doc(db, 'chats', chatId);
+    const messagesRef = collection(db, "chats", chatId, "messages");
+
+    const chatRef = doc(db, "chats", chatId);
     const chatSnap = await getDoc(chatRef);
     const chatData = chatSnap.data();
-    const recipients = (chatData?.users || []).filter((email: string) => email !== user?.email);
+    const recipients = (chatData?.users || []).filter(
+      (email: string) => email !== user?.email
+    );
 
     await addDoc(messagesRef, {
       text: input.trim(),
       sender: user.email,
       createdAt: serverTimestamp(),
       readBy: [],
-      unreadBy: recipients, 
+      unreadBy: recipients,
     });
 
-  
     // Update the chat document with lastMessage and updatedAt
-    await updateDoc(doc(db, 'chats', chatId), {
+    await updateDoc(doc(db, "chats", chatId), {
       lastMessage: input.trim(),
       updatedAt: serverTimestamp(),
       unreadBy: arrayUnion(otherUserEmail),
     });
-  
-    setInput('');
+
+    setInput("");
   };
 
   return (
@@ -128,16 +153,32 @@ export default function MessageThread({ chatId }: { chatId: string }) {
       <div className="bg-green-100 p-3 flex items-center gap-3 rounded-t">
         <div className="w-10 h-10 rounded-full bg-gray-300 overflow-hidden flex items-center justify-center">
           {otherUserProfileIcon ? (
-            <span className="text-2xl">{otherUserProfileIcon}</span>
+            isImageUrl(otherUserProfileIcon) ? (
+              // If the profile icon is an image URL, display it as an image
+              <Image
+                src={otherUserProfileIcon}
+                alt={otherUserProfileIcon.substring(
+                  0,
+                  otherUserProfileIcon.indexOf("@")
+                )}
+                className="w-full h-full object-cover"
+                width={40}
+                height={40}
+              />
+            ) : (
+              // If it's not a URL (e.g., an emoji), display it as text
+              <span className="text-2xl">{otherUserProfileIcon}</span>
+            )
           ) : (
+            // Fallback to first letter of email
             <span className="text-black text-xl font-semibold">
-              {otherUserEmail?.charAt(0).toUpperCase() ?? '?'}
+              {otherUserEmail?.charAt(0).toUpperCase() ?? "?"}
             </span>
           )}
         </div>
         <div className="flex flex-col">
           <span className="font-semibold text-sm">
-            {otherUsername || otherUserEmail || 'Unknown User'}
+            {otherUsername || otherUserEmail || "Unknown User"}
           </span>
           <span className="text-xs text-gray-500">{otherUserEmail}</span>
         </div>
@@ -149,20 +190,22 @@ export default function MessageThread({ chatId }: { chatId: string }) {
           const isSender = msg.sender === user?.email;
           const isLastSent = isSender && index === messages.length - 1;
           const hasSeenAll =
-            isLastSent && otherUserEmail && (msg.readBy || []).includes(otherUserEmail);
+            isLastSent &&
+            otherUserEmail &&
+            (msg.readBy || []).includes(otherUserEmail);
 
           return (
             <div
               key={msg.id}
               className={`relative w-fit px-4 py-2 rounded-2xl text-sm leading-tight ${
                 isSender
-                  ? 'bg-green-400 text-white self-end ml-auto'
-                  : 'bg-gray-200 text-black'
+                  ? "bg-green-400 text-white self-end ml-auto"
+                  : "bg-gray-200 text-black"
               }`}
               style={{
-                maxWidth: '85%',
-                alignSelf: isSender ? 'flex-end' : 'flex-start',
-                marginTop: '4px',
+                maxWidth: "85%",
+                alignSelf: isSender ? "flex-end" : "flex-start",
+                marginTop: "4px",
               }}
             >
               <div>{msg.text}</div>
@@ -184,7 +227,7 @@ export default function MessageThread({ chatId }: { chatId: string }) {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           placeholder="Type a message..."
           className="flex-1 border rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-300"
         />

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/app/auth-context';
-import { db } from '@/app/firebase';
+import { db } from '@/lib/firebase';
 import {
   collection,
   getDocs,
@@ -116,7 +116,7 @@ export default function SavedJobsPage() {
     };
 
     fetchSavedJobs();
-  }, [user]);
+  }, [user?.id]);
 
   const removeSavedJob = async (jobId: string) => {
     if (!user?.uid) return;

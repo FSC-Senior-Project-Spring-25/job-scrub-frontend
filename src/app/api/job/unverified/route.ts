@@ -24,7 +24,6 @@ export async function GET(req: NextRequest) {
             acc[job.id] = job.metadata;
             return acc;
         }, {});
-        console.log('Unverified jobs:', jobMap);
         return NextResponse.json(jobMap);
 
     } catch (error) {

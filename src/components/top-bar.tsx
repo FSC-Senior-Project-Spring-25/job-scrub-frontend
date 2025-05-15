@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import UserSearch from "@/components/UserSearch";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
-import { Switch } from "./ui/switch";
 
 interface NavItem {
   href: string;
@@ -53,7 +52,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
 
-  const [mounted, setMounted] = useState(false); // 👈 added
+  const [mounted, setMounted] = useState(false);
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
@@ -119,6 +118,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={false}
                     className="text-gray-700 hover:text-green-600 hover:scale-105 transition-all duration-300 whitespace-nowrap flex items-center"
                   >
                     {item.icon}
@@ -134,20 +134,21 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
 
             {/* User Actions */}
             <div className="flex items-center">
-              {/* Theme toggle switch */}
+              {/* Theme toggle button */}
               {mounted && (
-                <div className="flex items-center mr-8">
-                  <Moon className="mr-2 h-6 w-6 text-gray-500 dark:text-gray-400" />
-                  <Switch
-                    checked={theme === "dark"}
-                    onCheckedChange={() =>
-                      setTheme(theme === "dark" ? "light" : "dark")
-                    }
-                    className="data-[state=checked]:bg-green-600"
-                    aria-label="Toggle Theme"
-                  />
-                  <Sun className="ml-2 h-6 w-6 text-amber-500" />
-                </div>
+                <button
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  className="p-2 mr-4 rounded-full border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300"
+                  aria-label={`Switch to ${
+                    theme === "dark" ? "light" : "dark"
+                  } mode`}
+                >
+                  {theme === "dark" ? (
+                    <Sun className="h-5 w-5 text-amber-500" />
+                  ) : (
+                    <Moon className="h-5 w-5 text-gray-600" />
+                  )}
+                </button>
               )}
 
               {loading ? (

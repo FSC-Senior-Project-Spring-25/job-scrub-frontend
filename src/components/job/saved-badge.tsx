@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/app/auth-context';
-import { db } from '@/app/firebase';
+import { db } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { FaRegBookmark } from 'react-icons/fa';
 
@@ -21,7 +21,7 @@ export default function SavedJobsBadge() {
     };
 
     fetchSavedJobs();
-  }, [user]);
+  }, [user?.id]);
 
   return (
     <Link

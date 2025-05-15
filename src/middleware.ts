@@ -1,79 +1,43 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-export async function middleware(request: NextRequest) {
-  // Get the session cookie
-  const sessionCookie = request.cookies.get('session')?.value;
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/api/auth"];
 
-  // Public paths that don't require authentication
-  const publicPaths = ['/login', '/signup', '/', '/api'];
-  const isPublicPath = publicPaths.some(path => 
-    request.nextUrl.pathname === path || 
-    request.nextUrl.pathname.startsWith(path + '/')
+export async function middleware(req: NextRequest) {
+  const { pathname, searchParams } = req.nextUrl;
+
+  // skip Next.js static files and public folder
+  const isPublic = PUBLIC_PATHS.some(
+    p => pathname === p || pathname.startsWith(`${p}/`)
   );
+  if (isPublic) return NextResponse.next();
 
-  // Allow public paths and static files
-  if (isPublicPath || request.nextUrl.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
-    // If user is logged in and tries to access login/signup, redirect to home
-    // if (sessionCookie && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
-    //   return NextResponse.redirect(new URL('/', request.url));
-    // }
-    return NextResponse.next();
-  }
+  // skip Next.js prefetches
+  const isPrefetch =
+    req.method === "HEAD" ||
+    req.headers.get("x-middleware-prefetch") === "1" ||
+    searchParams.has("__next_router_prefetch");
+  if (isPrefetch) return NextResponse.next();
 
-  // If no session cookie and not a public path, redirect to login
-  if (!sessionCookie) {
-    // Store the attempted URL to redirect back after login
-    const response = NextResponse.redirect(new URL('/login', request.url));
-    response.cookies.set('returnTo', request.nextUrl.pathname);
-    return response;
-  }
+  // if the user is authenticated, allow the request to continue
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (token) return NextResponse.next();
 
-  try {
-    // Verify session with FastAPI through Next.js API route
-    const apiUrl = new URL('/api/auth/verify', request.url).toString();
-    
-    // Add debugging
-    console.log(`[middleware] Verifying session at ${apiUrl}`);
-    
-    const verifyResponse = await fetch(apiUrl, {
-      headers: {
-        Cookie: `session=${sessionCookie}`,
-      },
-      cache: 'no-store', // Prevent caching issues
-    });
+  const loginUrl = new URL("/login", req.url);
+  loginUrl.searchParams.set("callbackUrl", req.url);
 
-    // Add response status debugging
-    console.log(`[middleware] Verification response status: ${verifyResponse.status}`);
-    
-    const responseData = await verifyResponse.json();
-    console.log(`[middleware] Verification response:`, responseData);
-
-    if (!verifyResponse.ok || !responseData.valid) {
-      console.error('[middleware] Session verification failed:', responseData);
-      // Invalid session - clear cookie and redirect to login
-      const response = NextResponse.redirect(new URL('/login', request.url));
-      response.cookies.delete('session');
-      return response;
-    }
-
-    // Session is valid - allow request
-    const response = NextResponse.next();
-    
-    // Don't attempt to set Cookie header here as it's not the correct approach
-    // The session cookie is already in the browser and will be sent with subsequent requests
-    
-    return response;
-  } catch (error) {
-    console.error('[middleware] Verification error:', error);
-    // On error, redirect to login
-    const response = NextResponse.redirect(new URL('/login', request.url));
-    response.cookies.delete('session');
-    return response;
-  }
+  // If the user is not authenticated, redirect to the login page
+  const res = NextResponse.redirect(loginUrl);
+  res.cookies.set("redirectUrl", req.url, {
+    maxAge: 600,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
+  return res;
 }
 
-// Update matcher to be more specific
 export const config = {
   matcher: [
     /*
@@ -82,8 +46,7 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder files
-     * - api auth routes (handled separately)
      */
-    '/((?!_next/static|_next/image|favicon.ico|public/|assets/|api/auth/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public/|assets/).*)',
   ],
 };
