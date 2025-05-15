@@ -1,8 +1,31 @@
-"use client"
+/**
+ * jobs-content.tsx
+ *
+ * Renders the searchable / filterable job-list page.
+ * ▼  NEW IN THIS VERSION
+ *   • “Verified only” checkbox in the filter panel
+ *   • verifiedOnly flag in local state → sent to backend
+ *   • badge in “Active filters” row
+ */
 
-import { useState, useEffect, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+"use client";
+
+import { useState, useEffect, useRef, JSX } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+
+import { useAuth } from "@/app/auth-context";
+import type { Job } from "@/types/types";
+
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Pagination,
   PaginationContent,
@@ -11,12 +34,17 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/pagination"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Slider } from "@/components/ui/slider"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+} from "@/components/ui/pagination";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 import {
   MapPin,
   Briefcase,
@@ -28,35 +56,32 @@ import {
   RefreshCw,
   MapPinned,
   Clock,
-} from "lucide-react"
-import type { Job } from "@/types/types"
-import Link from "next/link"
-import { toast } from "sonner"
-import AnimatedLogo from "@/components/animated-logo"
-import { useSearchParams } from "next/navigation"
-import { useAuth } from "@/app/auth-context"
+} from "lucide-react";
 
-// Map job type to a more readable format
-const jobTypeLabels = {
+import { toast } from "sonner";
+import AnimatedLogo from "@/components/animated-logo";
+
+const jobTypeLabels: Record<Job["jobType"], string> = {
   fulltime: "Full Time",
   parttime: "Part Time",
   internship: "Internship",
   contract: "Contract",
   volunteer: "Volunteer",
-  remote: "Remote",
-}
+};
 
 export default function JobsContent() {
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [loading, setLoading] = useState(true)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [userLocation, setUserLocation] = useState<{
-    lat: number
-    lng: number
-  } | null>(null)
-  const [locationError, setLocationError] = useState<string | null>(null)
-  const [tempDistance, setTempDistance] = useState(50)
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  const [tempDistance, setTempDistance] = useState(50);
+
   const [filters, setFilters] = useState({
     jobType: {
       internship: false,
@@ -71,91 +96,82 @@ export default function JobsContent() {
       hybrid: false,
       onsite: false,
     },
-    maxDistance: 50, // in miles
+    maxDistance: 50,
     datePosted: "anytime",
-  })
-  const jobsPerPage = 10
-  const { user, loading: authLoading } = useAuth()
-  const searchParams = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get("search") || "")
-  const initialFetchDoneRef = useRef(false)
+    verifiedOnly: false,
+  });
 
+  const jobsPerPage = 10;
+  const { user, loading: authLoading } = useAuth();
+
+  /* search param from URL */
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const initialFetchDoneRef = useRef(false);
+
+  /** decide when to fetch all or filtered jobs */
   useEffect(() => {
     const searchQuery = searchParams.get("search");
-    
-    // Only update search from URL params when navigating to the page
-    // NOT when the user is actively typing in the search field
+
     if (searchQuery !== null && searchQuery !== search) {
-      setSearch(searchQuery || "");
+      setSearch(searchQuery);
     }
-    
-    // Only fetch once on initial load
+
     if (!initialFetchDoneRef.current) {
       initialFetchDoneRef.current = true;
-      
+
       const hasActiveFilters =
-        searchQuery ||
+        !!searchQuery ||
         Object.values(filters.jobType).some(Boolean) ||
         Object.values(filters.locationType).some(Boolean) ||
-        (userLocation && filters.maxDistance > 0 && filters.maxDistance !== 50) ||
+        filters.verifiedOnly ||
+        (userLocation && filters.maxDistance !== 50) ||
         filters.datePosted !== "anytime";
-      
-      if (hasActiveFilters) {
-        debouncedFetchFilteredJobs();
-      } else {
-        fetchJobs();
-      }
-      
-      return; // Exit early to prevent the filter-based fetch below
+
+      hasActiveFilters ? debouncedFetchFilteredJobs() : fetchJobs();
+      return;
     }
-    
-    // This will only run on subsequent renders when dependencies change
+
     const hasActiveFilters =
-      search ||
+      !!search ||
       Object.values(filters.jobType).some(Boolean) ||
       Object.values(filters.locationType).some(Boolean) ||
-      (userLocation && filters.maxDistance > 0 && filters.maxDistance !== 50) ||
+      filters.verifiedOnly ||
+      (userLocation && filters.maxDistance !== 50) ||
       filters.datePosted !== "anytime";
-    
-    if (hasActiveFilters) {
-      debouncedFetchFilteredJobs();
-    } else {
-      fetchJobs();
-    }
-  }, [searchParams, filters, userLocation]);
 
-  // Get user's current location
+    hasActiveFilters ? debouncedFetchFilteredJobs() : fetchJobs();
+  }, [searchParams, filters, userLocation]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      setLoading(true)
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          })
-          setLocationError(null)
-          toast.success("Location obtained successfully")
-          setLoading(false)
-        },
-        (error) => {
-          setLocationError("Could not get your location")
-          toast.error("Location access denied")
-          setLoading(false)
-        },
-        { timeout: 10000 },
-      )
-    } else {
-      setLocationError("Geolocation not supported")
-      toast.error("Browser doesn't support geolocation")
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation not supported");
+      toast.error("Browser doesn't support geolocation");
+      return;
     }
-  }
 
-  useEffect(() => {
-    setTempDistance(filters.maxDistance)
-  }, [filters.maxDistance])
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setLocationError(null);
+        toast.success("Location obtained successfully");
+        setLoading(false);
+      },
+      () => {
+        setLocationError("Could not get your location");
+        toast.error("Location access denied");
+        setLoading(false);
+      },
+      { timeout: 10000 }
+    );
+  };
 
-  // Reset all filters and fetch all jobs
+  useEffect(() => setTempDistance(filters.maxDistance), [filters.maxDistance]);
+
   const resetFilters = () => {
     setFilters({
       jobType: {
@@ -173,23 +189,21 @@ export default function JobsContent() {
       },
       maxDistance: 50,
       datePosted: "anytime",
-    })
-    setTempDistance(50)
-    setSearch("")
-    setUserLocation(null)
-    setLocationError(null)
-    fetchJobs()
-  }
+      verifiedOnly: false,
+    });
+    setTempDistance(50);
+    setSearch("");
+    setUserLocation(null);
+    setLocationError(null);
+    fetchJobs();
+  };
 
-  // Fetch filtered jobs based on current filters
   const fetchFilteredJobs = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
       const response = await fetch("/api/job/filtered", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           search: search || "",
           jobType: filters.jobType,
@@ -197,297 +211,214 @@ export default function JobsContent() {
           maxDistance: filters.maxDistance,
           datePosted: filters.datePosted,
           userLocation,
+          verified: filters.verifiedOnly ? true : null,
         }),
-      })
+      });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch filtered jobs")
-      }
+      if (!response.ok) throw new Error("Failed to fetch filtered jobs");
 
-      const data = await response.json()
+      const data = await response.json();
+      const jobs = processJobData(data);
+      setJobs(jobs);
 
-      // Transform the data to match the Job interface
-      const transformedJobs = processJobData(data)
-
-      setJobs(transformedJobs)
-
-      // Safely calculate total pages
-      const jobCount = transformedJobs?.length || 0
-      setTotalPages(Math.max(1, Math.ceil(jobCount / jobsPerPage)))
-    } catch (error) {
-      console.error("Error filtering jobs:", error)
-      toast.error("Failed to apply filters")
-      setJobs([])
-      setTotalPages(1)
+      const jobCount = jobs.length;
+      setTotalPages(Math.max(1, Math.ceil(jobCount / jobsPerPage)));
+    } catch (err) {
+      console.error("Error filtering jobs:", err);
+      toast.error("Failed to apply filters");
+      setJobs([]);
+      setTotalPages(1);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const debounce = (func: Function, delay: number) => {
-    let timeoutId: NodeJS.Timeout
-    return (...args: any[]) => {
-      clearTimeout(timeoutId)
-      timeoutId = setTimeout(() => func(...args), delay)
-    }
-  }
-
-  const debouncedFetchFilteredJobs = debounce(fetchFilteredJobs, 500)
+  const debounce = (fn: (...args: any[]) => void, delay: number) => {
+    let t: NodeJS.Timeout;
+    return (...a: any[]) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...a), delay);
+    };
+  };
+  const debouncedFetchFilteredJobs = debounce(fetchFilteredJobs, 500);
 
   const fetchJobs = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      // Use the /api/job/all route
-      const response = await fetch("/api/job/all")
+      const res = await fetch("/api/job/all");
+      if (!res.ok) throw new Error(`Failed to fetch jobs: ${res.status}`);
+      const data = await res.json();
+      const jobs = processJobData(data);
+      setJobs(jobs);
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch jobs: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      // Transform the data to match the Job interface
-      const transformedJobs = processJobData(data)
-
-      setJobs(transformedJobs)
-
-      // Safely calculate total pages
-      const jobCount = transformedJobs?.length || 0
-      setTotalPages(Math.max(1, Math.ceil(jobCount / jobsPerPage)))
-    } catch (error) {
-      console.error("Error fetching jobs:", error)
-      toast.error("Failed to fetch job listings")
-      // Set empty array to prevent undefined length errors
-      setJobs([])
-      setTotalPages(1)
+      const jobCount = jobs.length;
+      setTotalPages(Math.max(1, Math.ceil(jobCount / jobsPerPage)));
+    } catch (err) {
+      console.error("Error fetching jobs:", err);
+      toast.error("Failed to fetch job listings");
+      setJobs([]);
+      setTotalPages(1);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // Process job data from API response
   const processJobData = (data: any): Job[] => {
-    if (!Array.isArray(data)) {
-      // Handle case where data might be an object with job IDs as keys
-      if (data && typeof data === "object") {
-        return Object.entries(data).map(([id, job]: [string, any]) => {
-          const jobData = job.metadata || job
-          return transformJobData(id, jobData)
-        })
-      }
-      return []
+    if (!Array.isArray(data) && typeof data === "object") {
+      return Object.entries(data).map(([id, job]) => {
+        const jobObj = job as Record<string, any>;
+        return transformJobData(id, jobObj.metadata || jobObj);
+      });
     }
+    return (data as any[]).map((item) =>
+      transformJobData(item.id || "", item.metadata || item)
+    );
+  };
 
-    // Handle array format
-    return data.map((item: any) => {
-      const id = item.id || ""
-      const jobData = item.metadata || item
-      return transformJobData(id, jobData)
-    })
-  }
+  const transformJobData = (id: string, job: any): Job => ({
+    id,
+    title: job.title || "",
+    company: job.company || "",
+    description: job.description || "",
+    locationType: job.locationType || "onsite",
+    jobType: job.jobType || "fulltime",
+    address: job.address || job.location?.address || "",
+    date: job.date || new Date().toISOString(),
+    url: job.url || "",
+    salary: job.salary || "",
+    skills: Array.isArray(job.skills) ? job.skills : [],
+    keywords: Array.isArray(job.keywords) ? job.keywords : [],
+    benefits: Array.isArray(job.benefits) ? job.benefits : [],
+    verified: !!job.verified,
+    lat: job.lat || job.location?.lat || 0,
+    lon: job.lon || job.location?.lon || 0,
+    location: job.location || null,
+  });
 
-  // Transform raw job data to match Job interface
-  const transformJobData = (id: string, jobData: any): Job => {
-    return {
-      id: id,
-      title: jobData.title || "",
-      company: jobData.company || "",
-      description: jobData.description || "",
-      location: jobData.address || jobData.location?.address || "",
-      jobType: jobData.jobType || "fulltime",
-      locationType: jobData.locationType || "onsite",
-      date: jobData.date || new Date().toISOString(),
-      url: jobData.url || "",
-      salary: jobData.salary || "",
-      skills: Array.isArray(jobData.skills) ? jobData.skills : [],
-      keywords: Array.isArray(jobData.keywords) ? jobData.keywords : [],
-      benefits: Array.isArray(jobData.benefits) ? jobData.benefits : [],
-      verified: !!jobData.verified,
-      lat: jobData.lat || jobData.location?.lat || 0,
-      lon: jobData.lon || jobData.location?.lon || 0,
-      address: jobData.address || "",
-    }
-  }
+  const truncate = (txt = "", n = 150) =>
+    txt.length <= n ? txt : `${txt.slice(0, n)}…`;
 
-  // Format date for display
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateStr: string) => {
     try {
-      const jobDate = new Date(dateString)
-      const today = new Date()
-      const diffTime = Math.abs(today.getTime() - jobDate.getTime())
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      const jobDate = new Date(dateStr);
+      const today = new Date();
+      const diffDays = Math.ceil(Math.abs(+today - +jobDate) / 86_400_000);
 
-      if (diffDays === 0) return "Today"
-      if (diffDays === 1) return "Yesterday"
-      if (diffDays < 7) return `${diffDays} days ago`
-      if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
-      return jobDate.toLocaleDateString()
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "Yesterday";
+      if (diffDays < 7) return `${diffDays} days ago`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+      return jobDate.toLocaleDateString();
     } catch {
-      return "Unknown date"
+      return "Unknown date";
     }
-  }
+  };
 
-  // Filter jobs based on criteria
-  const filterJobs = (jobs: Job[]) => {
-    if (!Array.isArray(jobs)) return []
+  const filterJobs = (arr: Job[]) => {
+    const s = search.toLowerCase();
+    return arr.filter(
+      (j) =>
+        !s ||
+        j.title.toLowerCase().includes(s) ||
+        j.company.toLowerCase().includes(s) ||
+        j.description.toLowerCase().includes(s) ||
+        j.skills.some((sk) => sk.toLowerCase().includes(s))
+    );
+  };
 
-    return jobs.filter((job) => {
-      if (!job) return false
-
-      // Search filter
-      const searchLower = search.toLowerCase()
-      const matchesSearch =
-        !searchLower ||
-        job.title?.toLowerCase().includes(searchLower) ||
-        job.company?.toLowerCase().includes(searchLower) ||
-        job.description?.toLowerCase().includes(searchLower) ||
-        job.skills?.some((skill) => skill.toLowerCase().includes(searchLower)) ||
-        false
-
-      return matchesSearch
-    })
-  }
-
-  // Safely get current jobs for pagination
   const getCurrentJobs = () => {
-    if (!jobs || !Array.isArray(jobs)) return []
+    const filtered = filterJobs(jobs);
+    const start = (currentPage - 1) * jobsPerPage;
+    return filtered.slice(start, start + jobsPerPage);
+  };
 
-    const filteredJobsList = filterJobs(jobs)
-    const indexOfLastJob = currentPage * jobsPerPage
-    const indexOfFirstJob = indexOfLastJob - jobsPerPage
-    return filteredJobsList.slice(indexOfFirstJob, indexOfLastJob)
-  }
+  const currentJobs = getCurrentJobs();
+  const filteredCount = filterJobs(jobs).length;
 
-  const currentJobs = getCurrentJobs()
-  const filteredCount = filterJobs(jobs).length
+  const handlePageChange = (n: number) => {
+    setCurrentPage(n);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-  // Change page
-  const handlePageChange = (pageNumber: number) => {
-    setCurrentPage(pageNumber)
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  }
-
-  // Generate pagination numbers
   const generatePaginationItems = () => {
-    const items = []
-    const maxVisiblePages = 5
-    const calculatedTotalPages = Math.max(1, Math.ceil(filteredCount / jobsPerPage))
+    const items: JSX.Element[] = [];
+    const maxVisible = 5;
+    const pages = Math.max(1, Math.ceil(filteredCount / jobsPerPage));
 
-    if (calculatedTotalPages <= maxVisiblePages) {
-      for (let i = 1; i <= calculatedTotalPages; i++) {
-        items.push(
-          <PaginationItem key={i}>
-            <PaginationLink onClick={() => handlePageChange(i)} isActive={i === currentPage}>
-              {i}
-            </PaginationLink>
-          </PaginationItem>,
-        )
-      }
-    } else {
-      // Always show first page
+    const add = (i: number) =>
       items.push(
-        <PaginationItem key={1}>
-          <PaginationLink onClick={() => handlePageChange(1)} isActive={1 === currentPage}>
-            1
-          </PaginationLink>
-        </PaginationItem>,
-      )
-
-      // Show ellipsis if current page is more than 3
-      if (currentPage > 3) {
-        items.push(
-          <PaginationItem key="ellipsis-start">
-            <PaginationEllipsis />
-          </PaginationItem>,
-        )
-      }
-
-      // Show pages around current page
-      const start = Math.max(2, currentPage - 1)
-      const end = Math.min(calculatedTotalPages - 1, currentPage + 1)
-
-      for (let i = start; i <= end; i++) {
-        items.push(
-          <PaginationItem key={i}>
-            <PaginationLink onClick={() => handlePageChange(i)} isActive={i === currentPage}>
-              {i}
-            </PaginationLink>
-          </PaginationItem>,
-        )
-      }
-
-      // Show ellipsis if current page is less than totalPages - 2
-      if (currentPage < calculatedTotalPages - 2) {
-        items.push(
-          <PaginationItem key="ellipsis-end">
-            <PaginationEllipsis />
-          </PaginationItem>,
-        )
-      }
-
-      // Always show last page
-      items.push(
-        <PaginationItem key={calculatedTotalPages}>
+        <PaginationItem key={i}>
           <PaginationLink
-            onClick={() => handlePageChange(calculatedTotalPages)}
-            isActive={calculatedTotalPages === currentPage}
+            onClick={() => handlePageChange(i)}
+            isActive={i === currentPage}
           >
-            {calculatedTotalPages}
+            {i}
           </PaginationLink>
-        </PaginationItem>,
-      )
+        </PaginationItem>
+      );
+
+    if (pages <= maxVisible) {
+      for (let i = 1; i <= pages; i++) add(i);
+    } else {
+      add(1);
+      if (currentPage > 3)
+        items.push(
+          <PaginationItem key="e1">
+            <PaginationEllipsis />
+          </PaginationItem>
+        );
+
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(pages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) add(i);
+
+      if (currentPage < pages - 2)
+        items.push(
+          <PaginationItem key="e2">
+            <PaginationEllipsis />
+          </PaginationItem>
+        );
+      add(pages);
     }
+    return items;
+  };
 
-    return items
-  }
-
-  // Function to truncate description to a certain length
-  const truncateDescription = (text = "", maxLength = 150) => {
-    if (!text) return ""
-    if (text.length <= maxLength) return text
-    return text.substring(0, maxLength) + "..."
-  }
-
-  // Render loading skeletons
-  const renderSkeletons = () => {
-    return Array(jobsPerPage)
-      .fill(0)
-      .map((_, index) => (
-        <Card key={index} className="mb-4">
-          <CardHeader>
-            <Skeleton className="h-6 w-3/4 mb-2" />
-            <Skeleton className="h-4 w-1/2" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-4 w-full mb-2" />
-            <Skeleton className="h-4 w-full mb-2" />
-            <Skeleton className="h-4 w-3/4" />
-            <div className="flex flex-wrap gap-2 mt-4">
-              <Skeleton className="h-6 w-16" />
-              <Skeleton className="h-6 w-16" />
-              <Skeleton className="h-6 w-16" />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Skeleton className="h-10 w-32" />
-          </CardFooter>
-        </Card>
-      ))
-  }
+  const renderSkeletons = () =>
+    Array.from({ length: jobsPerPage }, (_, i) => (
+      <Card key={i} className="mb-4">
+        <CardHeader>
+          <Skeleton className="h-6 w-3/4 mb-2" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardHeader>
+        <CardContent>
+          {[...Array(3)].map((_, j) => (
+            <Skeleton key={j} className="h-4 w-full mb-2" />
+          ))}
+          <div className="flex flex-wrap gap-2 mt-4">
+            {[...Array(3)].map((_, j) => (
+              <Skeleton key={j} className="h-6 w-16" />
+            ))}
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Skeleton className="h-10 w-32" />
+        </CardFooter>
+      </Card>
+    ));
 
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
         <AnimatedLogo />
       </div>
-    )
+    );
   }
 
   return (
     <>
-      {/* Search and filter section */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-3">
+          {/* search input */}
           <div className="flex-1 flex items-center border border-gray-300 rounded-lg bg-white px-4 py-2">
             <Search className="text-gray-500 h-5 w-5" />
             <input
@@ -499,13 +430,22 @@ export default function JobsContent() {
             />
           </div>
 
+          {/* filters dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="flex gap-2 whitespace-nowrap">
+              <Button
+                variant="outline"
+                className="flex gap-2 whitespace-nowrap"
+              >
                 <Filter className="h-4 w-4" /> Filters
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[90vw] max-w-[700px] p-4" sideOffset={8}>
+
+            <DropdownMenuContent
+              align="end"
+              className="w-[90vw] max-w-[700px] p-4"
+              sideOffset={8}
+            >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <h4 className="font-medium mb-2">Job Type</h4>
@@ -513,24 +453,24 @@ export default function JobsContent() {
                     {Object.entries(filters.jobType).map(([type, checked]) => (
                       <div key={type} className="flex items-center space-x-2">
                         <Checkbox
-                          id={`job-type-${type}`}
+                          id={`jt-${type}`}
                           checked={checked}
-                          onCheckedChange={(isChecked) =>
-                            setFilters({
-                              ...filters,
-                              jobType: {
-                                ...filters.jobType,
-                                [type]: !!isChecked,
-                              },
-                            })
+                          onCheckedChange={(v) =>
+                            setFilters((p) => ({
+                              ...p,
+                              jobType: { ...p.jobType, [type]: !!v },
+                            }))
                           }
                         />
-                        <label htmlFor={`job-type-${type}`} className="text-sm capitalize">
+                        <label
+                          htmlFor={`jt-${type}`}
+                          className="text-sm capitalize"
+                        >
                           {type === "fullTime"
                             ? "Full Time"
                             : type === "partTime"
-                              ? "Part Time"
-                              : type.replace(/([A-Z])/g, " $1").trim()}
+                            ? "Part Time"
+                            : type.replace(/([A-Z])/g, " $1").trim()}
                         </label>
                       </div>
                     ))}
@@ -540,26 +480,31 @@ export default function JobsContent() {
                 <div>
                   <h4 className="font-medium mb-2">Location Type</h4>
                   <div className="space-y-2">
-                    {Object.entries(filters.locationType).map(([type, checked]) => (
-                      <div key={type} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`location-type-${type}`}
-                          checked={checked}
-                          onCheckedChange={(isChecked) =>
-                            setFilters({
-                              ...filters,
-                              locationType: {
-                                ...filters.locationType,
-                                [type]: !!isChecked,
-                              },
-                            })
-                          }
-                        />
-                        <label htmlFor={`location-type-${type}`} className="text-sm capitalize">
-                          {type}
-                        </label>
-                      </div>
-                    ))}
+                    {Object.entries(filters.locationType).map(
+                      ([type, checked]) => (
+                        <div key={type} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`lt-${type}`}
+                            checked={checked}
+                            onCheckedChange={(v) =>
+                              setFilters((p) => ({
+                                ...p,
+                                locationType: {
+                                  ...p.locationType,
+                                  [type]: !!v,
+                                },
+                              }))
+                            }
+                          />
+                          <label
+                            htmlFor={`lt-${type}`}
+                            className="text-sm capitalize"
+                          >
+                            {type}
+                          </label>
+                        </div>
+                      )
+                    )}
                   </div>
                 </div>
 
@@ -569,10 +514,7 @@ export default function JobsContent() {
                     className="w-full p-2 border rounded-md text-sm"
                     value={filters.datePosted}
                     onChange={(e) =>
-                      setFilters({
-                        ...filters,
-                        datePosted: e.target.value,
-                      })
+                      setFilters((p) => ({ ...p, datePosted: e.target.value }))
                     }
                   >
                     <option value="anytime">Anytime</option>
@@ -581,43 +523,62 @@ export default function JobsContent() {
                     <option value="30d">Last 30 days</option>
                   </select>
                 </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Other</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="verified-only"
+                        checked={filters.verifiedOnly}
+                        onCheckedChange={(v) =>
+                          setFilters((p) => ({ ...p, verifiedOnly: !!v }))
+                        }
+                      />
+                      <label htmlFor="verified-only" className="text-sm">
+                        Verified only
+                      </label>
+                    </div>
+                  </div>
+                </div>
               </div>
 
+              {/* bottom actions */}
               <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between gap-2">
+                {/* distance slider */}
                 <div className="flex flex-col">
                   <h4 className="font-medium mb-2">Distance (miles)</h4>
                   <div className="flex items-center gap-4">
                     <Slider
-                      className={`w-[200px] ${!userLocation ? "opacity-50" : ""}`}
+                      className={`w-[200px] ${
+                        !userLocation ? "opacity-50" : ""
+                      }`}
                       defaultValue={[filters.maxDistance]}
                       value={[tempDistance]}
                       max={500}
                       min={1}
                       step={5}
-                      onValueChange={(value) => {
-                        setTempDistance(value[0])
-                      }}
-                      onValueCommit={(value) => {
+                      onValueChange={(v) => setTempDistance(v[0])}
+                      onValueCommit={(v) => {
                         if (!userLocation) {
-                          // If user tries to use slider without location, prompt them
-                          toast.info("Please enable location to use distance filtering", {
-                            action: {
-                              label: "Enable Location",
-                              onClick: () => getCurrentLocation(),
-                            },
-                          })
-                          return
+                          toast.info(
+                            "Please enable location to use distance filtering",
+                            {
+                              action: {
+                                label: "Enable Location",
+                                onClick: getCurrentLocation,
+                              },
+                            }
+                          );
+                          return;
                         }
-
-                        // Only when the user releases the slider, update the actual filter
-                        setFilters({
-                          ...filters,
-                          maxDistance: value[0],
-                        })
+                        setFilters((p) => ({ ...p, maxDistance: v[0] }));
                       }}
                       disabled={!userLocation}
                     />
-                    <span className="text-sm block min-w-[60px]">{tempDistance} miles</span>
+                    <span className="text-sm block min-w-[60px]">
+                      {tempDistance} mi
+                    </span>
                   </div>
 
                   {!userLocation ? (
@@ -626,7 +587,12 @@ export default function JobsContent() {
                         <MapPin className="h-3 w-3 mr-1" />
                         Location access needed for distance filtering
                       </p>
-                      <Button size="sm" variant="outline" className="text-xs py-1 h-auto" onClick={getCurrentLocation}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs py-1 h-auto"
+                        onClick={getCurrentLocation}
+                      >
                         <MapPinned className="w-3 h-3 mr-1" />
                         Enable Location
                       </Button>
@@ -639,6 +605,7 @@ export default function JobsContent() {
                   )}
                 </div>
 
+                {/* reset btn */}
                 <div className="flex flex-col sm:flex-row gap-2 sm:items-end sm:self-end">
                   <Button variant="default" size="sm" onClick={resetFilters}>
                     Reset All
@@ -648,44 +615,54 @@ export default function JobsContent() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button onClick={fetchJobs} variant="ghost" className="whitespace-nowrap">
+          <Button
+            onClick={fetchJobs}
+            variant="ghost"
+            className="whitespace-nowrap"
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
         </div>
 
-        {/* Active filters display */}
         <div className="mt-3 flex flex-wrap gap-2">
           {userLocation && (
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 flex gap-1 items-center">
+            <Badge
+              variant="outline"
+              className="bg-blue-50 text-blue-700 flex gap-1 items-center"
+            >
               <MapPin className="h-3 w-3" />
-              Within {filters.maxDistance} miles
-              <button className="ml-1 hover:text-blue-900" onClick={() => setUserLocation(null)}>
+              Within {filters.maxDistance} mi
+              <button
+                className="ml-1 hover:text-blue-900"
+                onClick={() => setUserLocation(null)}
+              >
                 ×
               </button>
             </Badge>
           )}
 
           {Object.entries(filters.jobType)
-            .filter(([_, checked]) => checked)
-            .map(([type]) => (
-              <Badge key={type} variant="outline" className="bg-green-50 text-green-700 flex gap-1 items-center">
+            .filter(([_, v]) => v)
+            .map(([t]) => (
+              <Badge
+                key={t}
+                variant="outline"
+                className="bg-green-50 text-green-700 flex gap-1 items-center"
+              >
                 <Briefcase className="h-3 w-3" />
-                {type === "fullTime"
+                {t === "fullTime"
                   ? "Full Time"
-                  : type === "partTime"
-                    ? "Part Time"
-                    : type.replace(/([A-Z])/g, " $1").trim()}
+                  : t === "partTime"
+                  ? "Part Time"
+                  : t.replace(/([A-Z])/g, " $1").trim()}
                 <button
                   className="ml-1 hover:text-green-900"
                   onClick={() =>
-                    setFilters({
-                      ...filters,
-                      jobType: {
-                        ...filters.jobType,
-                        [type]: false,
-                      },
-                    })
+                    setFilters((p) => ({
+                      ...p,
+                      jobType: { ...p.jobType, [t]: false },
+                    }))
                   }
                 >
                   ×
@@ -694,21 +671,22 @@ export default function JobsContent() {
             ))}
 
           {Object.entries(filters.locationType)
-            .filter(([_, checked]) => checked)
-            .map(([type]) => (
-              <Badge key={type} variant="outline" className="bg-purple-50 text-purple-700 flex gap-1 items-center">
+            .filter(([_, v]) => v)
+            .map(([t]) => (
+              <Badge
+                key={t}
+                variant="outline"
+                className="bg-purple-50 text-purple-700 flex gap-1 items-center"
+              >
                 <MapPin className="h-3 w-3" />
-                {type.charAt(0).toUpperCase() + type.slice(1)}
+                {t[0].toUpperCase() + t.slice(1)}
                 <button
                   className="ml-1 hover:text-purple-900"
                   onClick={() =>
-                    setFilters({
-                      ...filters,
-                      locationType: {
-                        ...filters.locationType,
-                        [type]: false,
-                      },
-                    })
+                    setFilters((p) => ({
+                      ...p,
+                      locationType: { ...p.locationType, [t]: false },
+                    }))
                   }
                 >
                   ×
@@ -716,21 +694,39 @@ export default function JobsContent() {
               </Badge>
             ))}
 
+          {filters.verifiedOnly && (
+            <Badge
+              variant="outline"
+              className="bg-emerald-50 text-emerald-700 flex gap-1 items-center"
+            >
+              <CheckCircle className="h-3 w-3" />
+              Verified
+              <button
+                className="ml-1 hover:text-emerald-900"
+                onClick={() =>
+                  setFilters((p) => ({ ...p, verifiedOnly: false }))
+                }
+              >
+                ×
+              </button>
+            </Badge>
+          )}
+
           {filters.datePosted !== "anytime" && (
-            <Badge variant="outline" className="bg-orange-50 text-orange-700 flex gap-1 items-center">
+            <Badge
+              variant="outline"
+              className="bg-orange-50 text-orange-700 flex gap-1 items-center"
+            >
               <Clock className="h-3 w-3" />
               {filters.datePosted === "24h"
                 ? "Last 24 hours"
                 : filters.datePosted === "7d"
-                  ? "Last 7 days"
-                  : "Last 30 days"}
+                ? "Last 7 days"
+                : "Last 30 days"}
               <button
                 className="ml-1 hover:text-orange-900"
                 onClick={() =>
-                  setFilters({
-                    ...filters,
-                    datePosted: "anytime",
-                  })
+                  setFilters((p) => ({ ...p, datePosted: "anytime" }))
                 }
               >
                 ×
@@ -741,33 +737,47 @@ export default function JobsContent() {
           {(search ||
             Object.values(filters.jobType).some(Boolean) ||
             Object.values(filters.locationType).some(Boolean) ||
+            filters.verifiedOnly ||
             filters.datePosted !== "anytime" ||
             userLocation) && (
-            <Button variant="ghost" size="sm" onClick={resetFilters} className="text-gray-600 hover:text-gray-800">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
+              className="text-gray-600 hover:text-gray-800"
+            >
               Clear all filters
             </Button>
           )}
         </div>
       </div>
 
-      {/* Results summary */}
       <div className="mb-4 flex justify-between items-center">
         <div className="text-gray-600">
-          Showing {filteredCount > 0 ? `1-${Math.min(currentJobs.length, jobsPerPage)} of ${filteredCount}` : "0"} jobs
-          {search ? ` matching "${search}"` : ""}
+          Showing{" "}
+          {filteredCount > 0
+            ? `1-${Math.min(
+                currentJobs.length,
+                jobsPerPage
+              )} of ${filteredCount}`
+            : "0"}{" "}
+          jobs
+          {search && ` matching “${search}”`}
         </div>
       </div>
 
-      {/* Job listings */}
       <div className="grid gap-6">
         {loading ? (
           renderSkeletons()
         ) : currentJobs.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-lg shadow">
             <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-2xl font-semibold text-gray-700">No jobs found</h2>
+            <h2 className="text-2xl font-semibold text-gray-700">
+              No jobs found
+            </h2>
             <p className="text-gray-500 mt-2">
-              Try adjusting your search criteria or filters to find more opportunities.
+              Try adjusting your search criteria or filters to find more
+              opportunities.
             </p>
             <Button onClick={resetFilters} variant="outline" className="mt-4">
               Reset all filters
@@ -775,12 +785,19 @@ export default function JobsContent() {
           </div>
         ) : (
           currentJobs.map((job) => (
-            <Card key={job.id} className="overflow-hidden hover:shadow-md transition-shadow">
+            <Card
+              key={job.id}
+              className="overflow-hidden hover:shadow-md transition-shadow"
+            >
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle className="text-xl text-green-700">{job.title}</CardTitle>
-                    <CardDescription className="text-base font-medium">{job.company}</CardDescription>
+                    <CardTitle className="text-xl text-green-700">
+                      {job.title}
+                    </CardTitle>
+                    <CardDescription className="text-base font-medium">
+                      {job.company}
+                    </CardDescription>
                   </div>
                   {job.verified && (
                     <Badge className="bg-green-100 text-green-800 border-green-200">
@@ -789,6 +806,7 @@ export default function JobsContent() {
                   )}
                 </div>
               </CardHeader>
+
               <CardContent>
                 <div className="flex flex-wrap gap-2 mb-4 text-sm text-gray-600">
                   <div className="flex items-center">
@@ -798,7 +816,7 @@ export default function JobsContent() {
                   <div className="flex items-center">
                     <Briefcase className="w-4 h-4 mr-1" />
                     <span>
-                      {jobTypeLabels[job.jobType as keyof typeof jobTypeLabels] || job.jobType}
+                      {jobTypeLabels[job.jobType] || job.jobType}
                       {job.locationType === "remote" && " • Remote"}
                       {job.locationType === "hybrid" && " • Hybrid"}
                     </span>
@@ -815,17 +833,26 @@ export default function JobsContent() {
                   )}
                 </div>
 
-                <p className="text-gray-700 mb-4">{truncateDescription(job.description, 200)}</p>
+                <p className="text-gray-700 mb-4">
+                  {truncate(job.description, 200)}
+                </p>
 
-                {job.skills && job.skills.length > 0 && (
+                {job.skills.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {job.skills.slice(0, 5).map((skill, index) => (
-                      <Badge key={index} variant="outline" className="bg-green-50 text-green-700">
+                    {job.skills.slice(0, 5).map((skill, i) => (
+                      <Badge
+                        key={i}
+                        variant="outline"
+                        className="bg-green-50 text-green-700"
+                      >
                         {skill}
                       </Badge>
                     ))}
                     {job.skills.length > 5 && (
-                      <Badge variant="outline" className="bg-green-50 text-green-700">
+                      <Badge
+                        variant="outline"
+                        className="bg-green-50 text-green-700"
+                      >
                         +{job.skills.length - 5} more
                       </Badge>
                     )}
@@ -834,15 +861,24 @@ export default function JobsContent() {
 
                 {job.benefits && job.benefits.length > 0 && (
                   <div className="mt-2">
-                    <h4 className="text-sm font-medium text-gray-700 mb-1">Benefits:</h4>
+                    <h4 className="text-sm font-medium text-gray-700 mb-1">
+                      Benefits:
+                    </h4>
                     <div className="flex flex-wrap gap-2">
-                      {job.benefits.slice(0, 3).map((benefit, index) => (
-                        <Badge key={index} variant="secondary" className="bg-green-50 text-green-700">
-                          {benefit}
+                      {job.benefits.slice(0, 3).map((b, i) => (
+                        <Badge
+                          key={i}
+                          variant="secondary"
+                          className="bg-green-50 text-green-700"
+                        >
+                          {b}
                         </Badge>
                       ))}
                       {job.benefits.length > 3 && (
-                        <Badge variant="secondary" className="bg-green-50 text-green-700">
+                        <Badge
+                          variant="secondary"
+                          className="bg-green-50 text-green-700"
+                        >
                           +{job.benefits.length - 3} more
                         </Badge>
                       )}
@@ -850,11 +886,14 @@ export default function JobsContent() {
                   </div>
                 )}
               </CardContent>
+
               <CardFooter className="flex gap-3">
-                <Button className="bg-green-700 hover:bg-green-800 text-white" asChild>
+                <Button
+                  className="bg-green-700 hover:bg-green-800 text-white"
+                  asChild
+                >
                   <Link href={`/jobs/${job.id}`}>View Details</Link>
                 </Button>
-
                 {job.url && (
                   <Button
                     variant="outline"
@@ -869,13 +908,20 @@ export default function JobsContent() {
           ))
         )}
 
+        {/* pagination */}
         {!loading && currentJobs.length > 0 && (
           <Pagination className="mt-8">
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
-                  onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  onClick={() =>
+                    currentPage > 1 && handlePageChange(currentPage - 1)
+                  }
+                  className={
+                    currentPage === 1
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
                 />
               </PaginationItem>
 
@@ -883,8 +929,15 @@ export default function JobsContent() {
 
               <PaginationItem>
                 <PaginationNext
-                  onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
-                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  onClick={() =>
+                    currentPage < totalPages &&
+                    handlePageChange(currentPage + 1)
+                  }
+                  className={
+                    currentPage === totalPages
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
                 />
               </PaginationItem>
             </PaginationContent>
@@ -892,5 +945,5 @@ export default function JobsContent() {
         )}
       </div>
     </>
-  )
+  );
 }

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 interface Job {
   id: string;
   metadata: {
+    verified: boolean;
     title: string;
     company: string;
     url: string;
@@ -26,6 +27,7 @@ interface FilterParams {
   locationType?: Record<string, boolean>;
   maxDistance?: number;
   datePosted?: string;
+  verified?: boolean | null;
   userLocation?: { lat: number; lng: number } | null;
 }
 
@@ -58,6 +60,7 @@ export async function POST(req: NextRequest) {
       locationType = {},
       maxDistance = 50,
       datePosted = "anytime",
+      verified = null,
       userLocation = null,
     }: FilterParams = await req.json();
 
@@ -138,6 +141,9 @@ export async function POST(req: NextRequest) {
           }
         });
 
+       const matchesVerified =
+        verified === null ? true : (jobData.verified ?? false) === verified;
+
       // Distance filter
       let withinDistance = true;
       if (
@@ -181,6 +187,7 @@ export async function POST(req: NextRequest) {
         matchesJobType &&
         matchesLocationType &&
         withinDistance &&
+        matchesVerified &&
         matchesDatePosted
       );
     });
