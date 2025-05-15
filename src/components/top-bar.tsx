@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import UserSearch from "@/components/UserSearch";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
-import { Switch } from "./ui/switch";
 
 interface NavItem {
   href: string;
@@ -53,7 +52,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
 
-  const [mounted, setMounted] = useState(false); // 👈 added
+  const [mounted, setMounted] = useState(false);
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
@@ -119,6 +118,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={false}
                     className="text-gray-700 hover:text-green-600 hover:scale-105 transition-all duration-300 whitespace-nowrap flex items-center"
                   >
                     {item.icon}
