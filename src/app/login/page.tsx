@@ -50,7 +50,7 @@ export default function Login() {
         }
       } else {
         // Handle login error
-        setError(result?.error || "Login failed");
+        setError("Please check your email and password.");
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");

@@ -105,7 +105,7 @@ export default function ScrubbyChatPage() {
   const [resumeFile, setResume] = useState<File | null>(null);
   const [activeAgents, setActiveAgents] = useState<string[]>([]);
   const [conversationHistory, setHist] = useState<any[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<
     string | null
@@ -524,13 +524,6 @@ export default function ScrubbyChatPage() {
             sidebarOpen ? "hidden" : "hidden md:flex"
           }`}
         >
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-full bg-green-700 hover:bg-green-800 text-white"
-            aria-label="Open sidebar"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
           <button
             onClick={startNewConversation}
             className="p-2 rounded-full bg-green-700 hover:bg-green-800 text-white"
