@@ -227,6 +227,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   onClick={(e) => {
                     if (loading) {
                       e.preventDefault()
