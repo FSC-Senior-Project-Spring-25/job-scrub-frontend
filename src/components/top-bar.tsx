@@ -1,30 +1,23 @@
-"use client";
-import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
-import {
-  FaUser,
-  FaBars,
-  FaTimes,
-  FaSearch,
-  FaBriefcase,
-  FaRegFileAlt,
-  FaUserCircle,
-} from "react-icons/fa";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/app/auth-context";
-import { toast } from "sonner";
-import UserSearch from "@/components/UserSearch";
-import { useTheme } from "next-themes";
-import { Moon, Sun } from "lucide-react";
+"use client"
+import { useState, useRef, useEffect } from "react"
+import type React from "react"
+
+import Link from "next/link"
+import { FaUser, FaBars, FaTimes, FaSearch, FaBriefcase, FaRegFileAlt, FaUserCircle } from "react-icons/fa"
+import { useAuth } from "@/app/auth-context"
+import { toast } from "sonner"
+import UserSearch from "@/components/UserSearch"
+import { useTheme } from "next-themes"
+import { Moon, Sun } from "lucide-react"
 
 interface NavItem {
-  href: string;
-  label: string;
-  icon?: React.ReactNode;
+  href: string
+  label: string
+  icon?: React.ReactNode
 }
 
 interface TopBarProps {
-  navItems?: NavItem[];
+  navItems?: NavItem[]
 }
 
 const defaultNavItems: NavItem[] = [
@@ -43,35 +36,34 @@ const defaultNavItems: NavItem[] = [
     label: "Scrubby",
     icon: <FaRegFileAlt className="mr-2" />,
   },
-];
+]
 
 export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const { user, loading, logout } = useAuth();
-  const router = useRouter();
-  const { theme, setTheme } = useTheme();
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const { user, loading, logout } = useAuth()
+  const { theme, setTheme } = useTheme()
 
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(false)
 
-  const profileMenuRef = useRef<HTMLDivElement>(null);
-  const profileButtonRef = useRef<HTMLButtonElement>(null);
-  const profilePath = user ? `/profile/${user.uid}` : "/login";
+  const profileMenuRef = useRef<HTMLDivElement>(null)
+  const profileButtonRef = useRef<HTMLButtonElement>(null)
+  const profilePath = user ? `/profile/${user.uid}` : "/login"
 
-  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
-  const toggleProfileMenu = () => setIsProfileMenuOpen(!isProfileMenuOpen);
+  const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
+  const toggleProfileMenu = () => setIsProfileMenuOpen(!isProfileMenuOpen)
 
   const handleLogout = async () => {
-    const result = await logout();
+    const result = await logout()
     if (!result.success) {
-      console.error("Logout failed:", result.error);
-      toast.error("Failed to sign out. Please try again.");
+      console.error("Logout failed:", result.error)
+      toast.error("Failed to sign out. Please try again.")
     }
-  };
+  }
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -82,20 +74,20 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
         !profileMenuRef.current.contains(event.target as Node) &&
         !profileButtonRef.current.contains(event.target as Node)
       ) {
-        setIsProfileMenuOpen(false);
+        setIsProfileMenuOpen(false)
       }
     }
 
     // Add event listener when dropdown is open
     if (isProfileMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside)
     }
 
     // Clean up event listener
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isProfileMenuOpen]);
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [isProfileMenuOpen])
 
   return (
     <>
@@ -108,9 +100,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                 href="/"
                 className="text-2xl font-bold text-green-700 hover:text-green-800 transition-colors duration-300 flex items-center"
               >
-                <span className="bg-green-700 text-white px-2 py-1 rounded mr-1">
-                  Job
-                </span>
+                <span className="bg-green-700 text-white px-2 py-1 rounded mr-1">Job</span>
                 <span>Scrub</span>
               </Link>
               <div className="hidden lg:flex space-x-6">
@@ -119,7 +109,15 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                     key={item.href}
                     href={item.href}
                     prefetch={false}
-                    className="text-gray-700 hover:text-green-600 hover:scale-105 transition-all duration-300 whitespace-nowrap flex items-center"
+                    className={`text-gray-700 hover:text-green-600 hover:scale-105 transition-all duration-300 whitespace-nowrap flex items-center ${
+                      loading ? "pointer-events-none opacity-50" : ""
+                    }`}
+                    onClick={(e) => {
+                      if (loading) {
+                        e.preventDefault()
+                        return
+                      }
+                    }}
                   >
                     {item.icon}
                     {item.label}
@@ -139,9 +137,7 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                 <button
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                   className="p-2 mr-4 rounded-full border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300"
-                  aria-label={`Switch to ${
-                    theme === "dark" ? "light" : "dark"
-                  } mode`}
+                  aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
                 >
                   {theme === "dark" ? (
                     <Sun className="h-5 w-5 text-amber-500" />
@@ -188,8 +184,8 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                         </Link>
                         <button
                           onClick={() => {
-                            handleLogout();
-                            setIsProfileMenuOpen(false);
+                            handleLogout()
+                            setIsProfileMenuOpen(false)
                           }}
                           className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                         >
@@ -231,8 +227,16 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={toggleMenu}
-                  className="flex items-center text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-300"
+                  onClick={(e) => {
+                    if (loading) {
+                      e.preventDefault()
+                      return
+                    }
+                    toggleMenu()
+                  }}
+                  className={`flex items-center text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-300 ${
+                    loading ? "pointer-events-none opacity-50" : ""
+                  }`}
                 >
                   {item.icon}
                   {item.label}
@@ -242,18 +246,31 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
                 <>
                   <Link
                     href={profilePath}
-                    onClick={toggleMenu}
-                    className="flex items-center text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-300"
+                    onClick={(e) => {
+                      if (loading) {
+                        e.preventDefault()
+                        return
+                      }
+                      toggleMenu()
+                    }}
+                    className={`flex items-center text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-300 ${
+                      loading ? "pointer-events-none opacity-50" : ""
+                    }`}
                   >
                     <FaUserCircle className="mr-2" />
                     View Profile
                   </Link>
                   <button
                     onClick={() => {
-                      handleLogout();
-                      toggleMenu();
+                      if (!loading) {
+                        handleLogout()
+                        toggleMenu()
+                      }
                     }}
-                    className="flex items-center w-full text-left text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-300"
+                    disabled={loading}
+                    className={`flex items-center w-full text-left text-gray-700 hover:text-green-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-300 ${
+                      loading ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   >
                     <FaUser className="mr-2" />
                     Sign Out
@@ -268,5 +285,5 @@ export function TopBar({ navItems = defaultNavItems }: TopBarProps) {
         <div className="border-t border-gray-300 dark:border-gray-700" />
       </div>
     </>
-  );
+  )
 }
