@@ -12,7 +12,7 @@ import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
-import { Heart, MessageSquare, Plus, Send, User, ArrowRight, ShieldCheck } from "lucide-react"
+import { Heart, MessageSquare, Plus, Send, User, ArrowRight, ShieldCheck, AlertTriangle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import ReactMarkdown from "react-markdown"
 import Image from "next/image"
@@ -52,6 +52,17 @@ function isImageUrl(str: string): boolean {
     str.includes("firebasestorage.googleapis.com")
   )
 }
+
+const DeprecationBanner = () => (
+  <div className="bg-amber-100 dark:bg-amber-900 border-b border-amber-200 dark:border-amber-800 py-3 px-4 sticky top-0 z-50">
+    <div className="container mx-auto flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
+      <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+      <p>
+        <strong>Notice:</strong> As of May 26, 2025, we have downgraded our servers to reduce costs. You may experience increased latency and some features may no longer work properly due to performance limitations.
+      </p>
+    </div>
+  </div>
+)
 
 export default function HomePage() {
   const [search, setSearch] = useState("")
@@ -336,6 +347,8 @@ export default function HomePage() {
   // 2. Not logged in (welcome page + scrubby)
   if (!user) {
     return (
+      <>
+      <DeprecationBanner />
       <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col md:flex-row items-center justify-between px-12 py-12 gap-12">
         {/* Left side: Scrubby GIF */}
         <div className="flex-1 max-w-lg rounded-xl p-12 text-center self-start -mt-8 bg-[#DDDBD5] dark:bg-muted shadow-md">
@@ -385,10 +398,12 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+      </>
     )
   }
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-background flex flex-col">
+      <DeprecationBanner />
       <main className="flex-1 container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Left Sidebar / Profile Card */}
